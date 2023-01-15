@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 #include <tuple>
+#include <memory>
 
 using std::cout;
 using std::cerr;
@@ -19,40 +20,84 @@ using std::make_pair;
 #include <boost/program_options.hpp>
 using namespace boost::program_options;
 
-void printInfoLog(GLuint obj) {
+string infoLog(GLuint obj) {
 	int log_size = 0;
 	int bytes_written = 0;
 	glGetProgramiv(obj, GL_INFO_LOG_LENGTH, &log_size);
-	if (!log_size) return;
-	char *infoLog = new char[log_size];
-	glGetProgramInfoLog(obj, log_size, &bytes_written, infoLog);
-	std::cerr << infoLog << std::endl;
-	delete [] infoLog;
+
+	if (!log_size) return string();
+
+	std::unique_ptr<char[]> buffer(new char [log_size]);
+	
+	glGetProgramInfoLog(obj, log_size, &bytes_written, buffer.get());
+	// std::cerr << infoLog << std::endl;
+	return string(buffer.get());
 }
 
 
 
 pair<bool,GLuint> read_n_compile_shader(string filename, GLenum shaderType) {
 	GLuint hdlr;
+	GLint status;
+
 	std::ifstream is(filename, std::ios::in|std::ios::binary|std::ios::ate);
 	if (!is.is_open()) {
 		std::cerr << "Unable to open file " << filename << std::endl;
 		return make_pair(false,0);
 	}
 	long size = is.tellg();
-	char *buffer = new char[size+1];
+
+	std::unique_ptr<char[]> buffer(new char[size+1]);
+
 	is.seekg(0, std::ios::beg);
-	is.read (buffer, size);
+	is.read (buffer.get(), size);
 	is.close();
 	buffer[size] = 0;
 
 	hdlr = glCreateShader(shaderType);
 	glShaderSource(hdlr, 1, (const GLchar**)&buffer, NULL);
 	glCompileShader(hdlr);
-	std::cerr << "info log for " << filename << std::endl;
-	printInfoLog(hdlr);
-	delete [] buffer;
+	glGetShaderiv(hdlr, GL_COMPILE_STATUS, &status);
+	if(status != GL_TRUE) {
+		cerr << "could not compile shader.\n";
+		std::cerr << "info log for " << filename << "\n" <<
+			infoLog(hdlr) << "\n";
+
+		return make_pair(false,hdlr);
+	}
+
 	return make_pair(true,hdlr);
+}
+
+pair<bool,GLuint> program_from_shader_files(string vertex_path, string fragment_path) {
+	bool success;
+	GLuint vertex;
+	GLuint fragment;
+
+	tie(success, vertex) = read_n_compile_shader(vertex_path, GL_VERTEX_SHADER);
+	if(!success) {
+		cerr << "error reading and compiling shader: " << vertex_path << endl;
+		return make_pair(false, 0);
+	}
+	tie(success, fragment) = read_n_compile_shader(fragment_path, GL_FRAGMENT_SHADER);
+	if(!success) {
+		cerr << "error reading and compiling shader: " << fragment_path << endl;
+		return make_pair(false, 0);
+	}
+
+	GLuint prog = glCreateProgram();
+	glAttachShader(prog, vertex);
+	glAttachShader(prog, fragment);
+	glLinkProgram(prog);
+	GLint linker_status;
+	glGetProgramiv(prog, GL_LINK_STATUS, &linker_status);
+
+	if(linker_status != GL_TRUE) {
+		cerr << "error linking program: \n" << infoLog(prog) << "\n";
+		return make_pair(false, prog);
+	}
+
+	return make_pair(true, prog);
 }
 
 
@@ -76,56 +121,23 @@ int main(int ac, char * av[]) {
 
 	glutInit(&ac, av);
 	glutCreateWindow("GL PLanets");
+	GLenum ret;
 
-
-    GLFWwindow* window;
-
-    /* Initialize the library */
-    if (!glfwInit()) {
-		cerr << "could not initialize glfw\n";
-        return -1;
-	}
-
-	if (!glewInit()) {
-		cerr << "could not initialize glew\n";
+	if ((ret = glewInit()) != GLEW_OK) {
+		cerr << "could not initialize glew: " << glewGetErrorString(ret) << "\n";
 		return -1;
 	}
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(640, 480, "GL Planets", NULL, NULL);
+	GLuint prog;
+	bool success;
+	tie(success, prog) = program_from_shader_files(vertex_shader, fragment_shader);
+	if(!success) return -1;
 
-	bool success = false;
-	GLuint vertex;
-	GLuint fragment;
-
-	tie(success, vertex) = read_n_compile_shader(vertex_shader, GL_VERTEX_SHADER);
-	if(!success) {
-		cerr << "error reading and compiling shader: " << vertex_shader << endl;
-		return -1;
-	}
-	tie(success, fragment) = read_n_compile_shader(fragment_shader, GL_FRAGMENT_SHADER);
-	if(!success) {
-		cerr << "error reading and compiling shader: " << fragment_shader << endl;
-		return -1;
-	}
-
-    /* Loop until the user closes the window */
-    while (!glfwWindowShouldClose(window))
-    {
-        /* Render here */
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);
-
-        /* Poll for and process events */
-        glfwPollEvents();
-    }
-
-    glfwTerminate();
+	glutMainLoop();
+	
 
     return 0;    
 }

@@ -134,6 +134,9 @@ int main(int ac, char * av[]) {
 
 	glutInit(&ac, av);
 	glutCreateWindow("GL PLanets");
+
+
+	cout << "GL Version: " << glGetString(GL_VERSION) << endl;
 	
 	GLenum ret;
 

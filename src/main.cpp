@@ -1,13 +1,9 @@
+#define GLEW_STATIC
+#include <GL/glew.h>
 
+#define GLFW_INCLUDE_ES
+#include <GLFW/glfw3.h>
 
-#include <GL/glut.h>
-
-#ifndef GL_ES_VERSION_2_0
-#include <GLES2/gl2.h>
-#endif
-#include <GLES2/gl2ext.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 
 #include <iostream>
 #include <fstream>
@@ -43,8 +39,6 @@ string infoLog(GLuint obj) {
 	// std::cerr << infoLog << std::endl;
 	return string(buffer.get());
 }
-
-
 
 pair<bool,GLuint> read_n_compile_shader(string filename, GLenum shaderType) {
 	GLuint hdlr;
@@ -113,6 +107,9 @@ pair<bool,GLuint> program_from_shader_files(string vertex_path, string fragment_
 	return make_pair(true, prog);
 }
 
+void error_callback(int error, const char * desc) {
+	cerr << "ERROR: " << desc << "\n";
+}
 
 int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
@@ -132,30 +129,113 @@ int main(int ac, char * av[]) {
 		return 0;
 	}
 
-	glutInit(&ac, av);
-	glutCreateWindow("GL PLanets");
+	size_t n_frames;
+	double time_of_first_swap;
+	double time_of_last_swap;
+	double time_now;
 
 
-	cout << "GL Version: " << glGetString(GL_VERSION) << endl;
+	if (!glfwInit())
+	{
+		fprintf(stderr, "Error: Failed to init GLFW\n");
+		return -1;
+	}
+	glfwSetErrorCallback(error_callback);
+
+
+	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+
+	auto monitor = glfwGetPrimaryMonitor();
+	auto mode = glfwGetVideoMode(monitor);
 	
-	GLenum ret;
+	glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+	glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-	// if ((ret = glewInit()) != GLEW_OK) {
-	// 	cerr << "could not initialize glew: " << glewGetErrorString(ret) << "\n";
-	// 	return -1;
-	// }
+	auto window = glfwCreateWindow(mode->width,
+	                          mode->height,
+	                          "GL Planets",
+	                          monitor,
+	                          NULL);
+	
+	if (!window)
+	{
+		fprintf(stderr, "Error: Failed to create window\n");
+		glfwTerminate();
+		return -1;
+	}
 
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
+	printf("%dx%d @ %dHz\n", mode->width,
+	                         mode->height,
+	                         mode->refreshRate);
+	
+	glfwMakeContextCurrent(window);
+
+	glewExperimental = GL_TRUE;
+  	glewInit();
+
+	printf("OpenGL info:\n"
+	       "\tVendor   = \"%s\"\n"
+	       "\tRenderer = \"%s\"\n"
+	       "\tVersion  = \"%s\"\n",
+	       glGetString(GL_VENDOR),
+	       glGetString(GL_RENDERER),
+	       glGetString(GL_VERSION));
+
+	glfwSwapInterval(1);
+
+
 
 	GLuint prog;
 	bool success;
 	tie(success, prog) = program_from_shader_files(vertex_shader, fragment_shader);
 	if(!success) return -1;
 
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glfwSwapBuffers(window);
 
 
-	glutMainLoop();
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+	time_of_first_swap = glfwGetTime();
+	n_frames = 0;
+	time_of_last_swap = time_of_first_swap;
+
+	while (!glfwWindowShouldClose(window) &&
+	       (glfwGetTime() - time_of_first_swap) < 10.0)
+	{
+		/* Process window events */
+		glfwPollEvents();
+		
+		/* Clear the framebuffer to black */
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		/* Display framebuffer */
+		glfwSwapBuffers(window);
+		
+		/* Update fps counter */
+		time_now = glfwGetTime();
+		printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
+		time_of_last_swap = time_now;
+		++n_frames;
+	}
+
+	printf("%zu frames in %gs = %.1fHz\n",
+	    n_frames,
+	    time_of_last_swap - time_of_first_swap,
+	    (double)n_frames / (time_of_last_swap - time_of_first_swap));
+
+
+
+	glfwMakeContextCurrent(NULL);
+	
+	glfwDestroyWindow(window);
+	glfwTerminate();
+
 	
 
     return 0;    

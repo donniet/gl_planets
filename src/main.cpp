@@ -1,6 +1,13 @@
 
-#include <GL/glew.h>
+
 #include <GL/glut.h>
+
+#ifndef GL_ES_VERSION_2_0
+#include <GLES2/gl2.h>
+#endif
+#include <GLES2/gl2ext.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 #include <iostream>
 #include <fstream>
@@ -127,10 +134,10 @@ int main(int ac, char * av[]) {
 	
 	GLenum ret;
 
-	if ((ret = glewInit()) != GLEW_OK) {
-		cerr << "could not initialize glew: " << glewGetErrorString(ret) << "\n";
-		return -1;
-	}
+	// if ((ret = glewInit()) != GLEW_OK) {
+	// 	cerr << "could not initialize glew: " << glewGetErrorString(ret) << "\n";
+	// 	return -1;
+	// }
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);

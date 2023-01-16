@@ -32,7 +32,10 @@ string infoLog(GLuint obj) {
 	int bytes_written = 0;
 	glGetProgramiv(obj, GL_INFO_LOG_LENGTH, &log_size);
 
-	if (!log_size) return string();
+	if (!log_size) {
+		cout << "no log found\n";
+		return "";
+	}
 
 	std::unique_ptr<char[]> buffer(new char [log_size]);
 	

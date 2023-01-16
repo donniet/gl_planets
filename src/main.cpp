@@ -11,6 +11,7 @@
 #include <glm/ext/matrix_clip_space.hpp> // glm::perspective
 #include <glm/ext/scalar_constants.hpp> // glm::pi
 
+#include <stb/stb_image.h>
 
 #include <iostream>
 #include <fstream>
@@ -64,7 +65,7 @@ pair<bool,GLuint> read_n_compile_shader(string filename, GLenum shaderType) {
 	is.read (buffer.get(), size);
 	is.close();
 	buffer[size] = 0;
-	cout << "shader source:\n" << buffer.get() << endl;
+	// cout << "shader source:\n" << buffer.get() << endl;
 
 	GLchar const * sh = buffer.get();
 
@@ -121,6 +122,7 @@ void error_callback(int error, const char * desc) {
 int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
 	string fragment_shader = "../shaders/sphere_frag.glsl";
+	string texture_path = "../img/iomoon.jpg";
 	float fieldOfView = 60., near = 1., far = 10.;
 
 	options_description desc("options");
@@ -129,6 +131,7 @@ int main(int ac, char * av[]) {
 		("vertex,v", value(&vertex_shader), "vertex shader path")
 		("fragment,f", value(&fragment_shader), "fragment shader path")
 		("fov", value(&fieldOfView), "field of view in degrees")
+		("texture,t", value(&texture_path), "path to texture of planet")
 	;
 	variables_map vm;
 	store(parse_command_line(ac, av, desc), vm);
@@ -136,6 +139,15 @@ int main(int ac, char * av[]) {
 	if(vm.count("help")) {
 		cout << desc << "\n";
 		return 0;
+	}
+
+	int texture_width, texture_height, texture_channels;
+	unsigned char * image = stbi_load(texture_path.c_str(), &texture_width, &texture_height, &texture_channels, 3);
+	if(image == nullptr) {
+		cerr << "unable to load texture '" << texture_path << "'\n";
+		return -1;
+	} else {
+		cout << "loaded texture '" << texture_path << "' " << texture_width << "x" << texture_height << "c" << texture_channels << endl;
 	}
 
 	// convert to radians
@@ -199,8 +211,6 @@ int main(int ac, char * av[]) {
 
 	glfwSwapInterval(1);
 
-
-
 	GLuint prog;
 	bool success;
 	tie(success, prog) = program_from_shader_files(vertex_shader, fragment_shader);
@@ -214,6 +224,22 @@ int main(int ac, char * av[]) {
 
 	// handle resize
 	glm::mat4 projection = glm::perspective(fieldOfView, (float)mode->width / (float)mode->height, near, far);
+
+	GLuint texture_id;
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+	glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texture_width, texture_height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glfwSwapBuffers(window);
@@ -241,8 +267,7 @@ int main(int ac, char * av[]) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
 
 
-	while (!glfwWindowShouldClose(window) &&
-	       (glfwGetTime() - time_of_first_swap) < 10.0)
+	while (!glfwWindowShouldClose(window))
 	{
 		/* Process window events */
 		glfwPollEvents();
@@ -277,7 +302,7 @@ int main(int ac, char * av[]) {
 		glUniform3fv(sun_location, 1, &sun[0]);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindTexture(GL_TEXTURE_2D, texture_id);
 		glUniform1i(texture_location, 0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer);
@@ -309,6 +334,8 @@ int main(int ac, char * av[]) {
 	
 	glfwDestroyWindow(window);
 	glfwTerminate();
+
+    stbi_image_free(image);
 
 	
 

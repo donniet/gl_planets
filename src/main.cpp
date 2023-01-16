@@ -53,9 +53,12 @@ pair<bool,GLuint> read_n_compile_shader(string filename, GLenum shaderType) {
 	is.read (buffer.get(), size);
 	is.close();
 	buffer[size] = 0;
+	cout << "shader source:\n" << buffer.get() << endl;
+
+	GLchar const * sh = buffer.get();
 
 	hdlr = glCreateShader(shaderType);
-	glShaderSource(hdlr, 1, (const GLchar**)&buffer, NULL);
+	glShaderSource(hdlr, 1, (const GLchar*const*)&sh, NULL);
 	glCompileShader(hdlr);
 	glGetShaderiv(hdlr, GL_COMPILE_STATUS, &status);
 	if(status != GL_TRUE) {
@@ -76,12 +79,12 @@ pair<bool,GLuint> program_from_shader_files(string vertex_path, string fragment_
 
 	tie(success, vertex) = read_n_compile_shader(vertex_path, GL_VERTEX_SHADER);
 	if(!success) {
-		cerr << "error reading and compiling shader: " << vertex_path << endl;
+		cerr << "error reading and compiling vertex shader: " << vertex_path << endl;
 		return make_pair(false, 0);
 	}
 	tie(success, fragment) = read_n_compile_shader(fragment_path, GL_FRAGMENT_SHADER);
 	if(!success) {
-		cerr << "error reading and compiling shader: " << fragment_path << endl;
+		cerr << "error reading and compiling fragment shader: " << fragment_path << endl;
 		return make_pair(false, 0);
 	}
 
@@ -121,6 +124,7 @@ int main(int ac, char * av[]) {
 
 	glutInit(&ac, av);
 	glutCreateWindow("GL PLanets");
+	
 	GLenum ret;
 
 	if ((ret = glewInit()) != GLEW_OK) {
@@ -135,6 +139,8 @@ int main(int ac, char * av[]) {
 	bool success;
 	tie(success, prog) = program_from_shader_files(vertex_shader, fragment_shader);
 	if(!success) return -1;
+
+
 
 	glutMainLoop();
 	

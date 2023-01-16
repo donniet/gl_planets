@@ -1,9 +1,6 @@
 precision mediump float;
-
 attribute vec2 corner;
-
 uniform mat4 inv;
-
 varying vec3 direction;
 
 void main() {

@@ -4,6 +4,13 @@
 #define GLFW_INCLUDE_ES
 #include <GLFW/glfw3.h>
 
+#include <glm/vec3.hpp> // glm::vec3
+#include <glm/vec4.hpp> // glm::vec4
+#include <glm/mat4x4.hpp> // glm::mat4
+#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
+#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
+#include <glm/ext/scalar_constants.hpp> // glm::pi
+
 
 #include <iostream>
 #include <fstream>
@@ -114,12 +121,14 @@ void error_callback(int error, const char * desc) {
 int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
 	string fragment_shader = "../shaders/sphere_frag.glsl";
+	float fieldOfView = 60., near = 1., far = 10.;
 
 	options_description desc("options");
 	desc.add_options()
 		("help,h", "prints this message")
 		("vertex,v", value(&vertex_shader), "vertex shader path")
 		("fragment,f", value(&fragment_shader), "fragment shader path")
+		("fov", value(&fieldOfView), "field of view in degrees")
 	;
 	variables_map vm;
 	store(parse_command_line(ac, av, desc), vm);
@@ -128,6 +137,9 @@ int main(int ac, char * av[]) {
 		cout << desc << "\n";
 		return 0;
 	}
+
+	// convert to radians
+	fieldOfView *= glm::pi<float>() / 180.;
 
 	size_t n_frames;
 	double time_of_first_swap;
@@ -194,6 +206,15 @@ int main(int ac, char * av[]) {
 	tie(success, prog) = program_from_shader_files(vertex_shader, fragment_shader);
 	if(!success) return -1;
 
+	auto corner_location = glGetAttribLocation(prog, "corner");
+	auto inv_location = glGetUniformLocation(prog, "inv");
+	auto camera_location = glGetUniformLocation(prog, "camera");
+	auto texture_location = glGetUniformLocation(prog, "texture");
+	auto sun_location = glGetUniformLocation(prog, "sun");
+
+	// handle resize
+	glm::mat4 projection = glm::perspective(fieldOfView, (float)mode->width / (float)mode->height, near, far);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glfwSwapBuffers(window);
 
@@ -205,6 +226,21 @@ int main(int ac, char * av[]) {
 	n_frames = 0;
 	time_of_last_swap = time_of_first_swap;
 
+	// setup buffers
+	GLuint corners_buffer;
+
+	float corners[] = {
+		-1, -1,
+		1, -1,
+		1, 1,
+		-1, 1
+	};
+
+	glGenBuffers(1, &corners_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, corners_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
+
+
 	while (!glfwWindowShouldClose(window) &&
 	       (glfwGetTime() - time_of_first_swap) < 10.0)
 	{
@@ -213,13 +249,51 @@ int main(int ac, char * av[]) {
 		
 		/* Clear the framebuffer to black */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glm::mat4 m = glm::identity<glm::mat4>();
+		glm::mat4 view = glm::identity<glm::mat4>();
+
+		view = glm::translate(view, glm::vec3(0, 0, -2));
+		view = glm::rotate(view, (float)time_now / (float)1200., glm::vec3(0, 1, 0));
+
+		glm::mat4 mv = projection;
+		mv *= view;
+		mv *= m;
+
+		glm::vec4 camera(0, 0, 0, 1);
+		glm::mat4 inv = glm::inverse(view);
+		camera = inv * camera;
+
+		glm::vec3 sun = glm::vec3(
+			glm::cos((float)time_now / (float)6000.), 
+			0.,
+			-glm::sin((float)time_now / (float)6000.));
+
+
+		glUseProgram(prog);
+		glEnableVertexAttribArray(corner_location);
+		glUniformMatrix4fv(inv_location, 1, GL_FALSE, &inv[0][0]);
+		glUniform3fv(camera_location, 1, &camera[0]);
+		glUniform3fv(sun_location, 1, &sun[0]);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glUniform1i(texture_location, 0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer);
+		glVertexAttribPointer(corner_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+		glDisableVertexAttribArray(corner_location);
+
+
 		
 		/* Display framebuffer */
 		glfwSwapBuffers(window);
 		
 		/* Update fps counter */
 		time_now = glfwGetTime();
-		printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
+		//printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
 		time_of_last_swap = time_now;
 		++n_frames;
 	}

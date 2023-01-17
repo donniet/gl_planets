@@ -20,10 +20,12 @@ void swap(inout float a, inout float b) {
   b = c;
 }
 
-bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
-  float discr = b * b - 4. * a * c;
-  if (discr < 0.) return false;
+bool solveQuadratic(float a, float b, float c, out float x0, out float x1, out float discr) {
+  discr = b * b - 4. * a * c;
+  bool ret = discr > 0.;
 
+  if (discr < 0.) discr = -discr;
+  
   if (discr == 0.) {
     x0 = x1 = -0.5 * b / a;
   } else {
@@ -39,7 +41,9 @@ bool solveQuadratic(float a, float b, float c, out float x0, out float x1) {
     if (x0 > x1) swap(x0, x1);
   }
 
-  return true;
+  if(!ret) discr = -discr;  
+
+  return ret;
 }
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
@@ -51,8 +55,10 @@ bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec
   float b = 2. * dot(dir, L);
   float c = dot(L, L) - r2;
 
-  float t0, t1;
-  if (!solveQuadratic(a, b, c, t0, t1)) {
+  float t0, t1, discr;
+  solveQuadratic(a, b, c, t0, t1, discr);
+
+  if(discr < 0.) {
     return false;
   }
 

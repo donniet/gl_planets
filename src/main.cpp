@@ -123,6 +123,7 @@ int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
 	string fragment_shader = "../shaders/sphere_frag.glsl";
 	string texture_path = "../img/iomoon.jpg";
+	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.tif";
 	float fieldOfView = 60., near = 1., far = 10.;
 
 	options_description desc("options");
@@ -281,13 +282,15 @@ int main(int ac, char * av[]) {
 		view = glm::translate(view, glm::vec3(0, 0, -2));
 		view = glm::rotate(view, (float)time_now / (float)1200., glm::vec3(0, 1, 0));
 
-		glm::mat4 mv = projection;
-		mv *= view;
-		mv *= m;
+		glm::mat4 mv = projection * view * m;
+		mv = glm::inverse(mv);
+
 
 		glm::vec4 camera(0, 0, 0, 1);
 		glm::mat4 inv = glm::inverse(view);
 		camera = inv * camera;
+
+		cout << "camera: " << camera.x << " " << camera.y << " " << camera.z << " " << camera.w << endl;
 
 		glm::vec3 sun = glm::vec3(
 			glm::cos((float)time_now / (float)6000.), 
@@ -297,7 +300,7 @@ int main(int ac, char * av[]) {
 
 		glUseProgram(prog);
 		glEnableVertexAttribArray(corner_location);
-		glUniformMatrix4fv(inv_location, 1, GL_FALSE, &inv[0][0]);
+		glUniformMatrix4fv(inv_location, 1, GL_FALSE, &mv[0][0]);
 		glUniform3fv(camera_location, 1, &camera[0]);
 		glUniform3fv(sun_location, 1, &sun[0]);
 

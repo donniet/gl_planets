@@ -123,7 +123,7 @@ int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
 	string fragment_shader = "../shaders/sphere_frag.glsl";
 	string texture_path = "../img/iomoon.jpg";
-	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.tif";
+	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
 	float fieldOfView = 60., near = 1., far = 10.;
 
 	options_description desc("options");
@@ -133,6 +133,7 @@ int main(int ac, char * av[]) {
 		("fragment,f", value(&fragment_shader), "fragment shader path")
 		("fov", value(&fieldOfView), "field of view in degrees")
 		("texture,t", value(&texture_path), "path to texture of planet")
+		("starfield,s", value(&starfield_path), "path to starfield spheremap")
 	;
 	variables_map vm;
 	store(parse_command_line(ac, av, desc), vm);
@@ -149,6 +150,15 @@ int main(int ac, char * av[]) {
 		return -1;
 	} else {
 		cout << "loaded texture '" << texture_path << "' " << texture_width << "x" << texture_height << "c" << texture_channels << endl;
+	}
+
+	int starfield_width, starfield_height, starfield_channels;
+	unsigned char * starfield = stbi_load(starfield_path.c_str(), &starfield_width, &starfield_height, &starfield_channels, 3);
+	if(starfield == nullptr) {
+		cerr << "unable to load starfield '" << starfield_path << "'\n";
+		return -1;
+	} else {
+		cout << "loaded starfield '" << starfield_path << "' " << starfield_width << "x" << starfield_height << "c" << starfield_channels << endl;
 	}
 
 	// convert to radians
@@ -221,12 +231,13 @@ int main(int ac, char * av[]) {
 	auto inv_location = glGetUniformLocation(prog, "inv");
 	auto camera_location = glGetUniformLocation(prog, "camera");
 	auto texture_location = glGetUniformLocation(prog, "texture");
+	auto starfield_location = glGetUniformLocation(prog, "starfield");
 	auto sun_location = glGetUniformLocation(prog, "sun");
 
 	// handle resize
 	glm::mat4 projection = glm::perspective(fieldOfView, (float)mode->width / (float)mode->height, near, far);
 
-	GLuint texture_id;
+	GLuint texture_id, starfield_id;
 	glGenTextures(1, &texture_id);
 	glBindTexture(GL_TEXTURE_2D, texture_id);
 
@@ -240,7 +251,21 @@ int main(int ac, char * av[]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	
+
+
+	glGenTextures(1, &starfield_id);
+	glBindTexture(GL_TEXTURE_2D, starfield_id);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+	glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, starfield_width, starfield_height, 0, GL_RGB, GL_UNSIGNED_BYTE, starfield);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glfwSwapBuffers(window);
@@ -290,7 +315,7 @@ int main(int ac, char * av[]) {
 		glm::mat4 inv = glm::inverse(view);
 		camera = inv * camera;
 
-		cout << "camera: " << camera.x << " " << camera.y << " " << camera.z << " " << camera.w << endl;
+		// cout << "camera: " << camera.x << " " << camera.y << " " << camera.z << " " << camera.w << endl;
 
 		glm::vec3 sun = glm::vec3(
 			glm::cos((float)time_now / (float)6000.), 
@@ -308,6 +333,10 @@ int main(int ac, char * av[]) {
 		glBindTexture(GL_TEXTURE_2D, texture_id);
 		glUniform1i(texture_location, 0);
 
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, starfield_id);
+		glUniform1i(starfield_location, 1);
+
 		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer);
 		glVertexAttribPointer(corner_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -321,7 +350,7 @@ int main(int ac, char * av[]) {
 		
 		/* Update fps counter */
 		time_now = glfwGetTime();
-		//printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
+		printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
 		time_of_last_swap = time_now;
 		++n_frames;
 	}

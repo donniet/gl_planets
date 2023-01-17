@@ -2,6 +2,7 @@ precision mediump float;
 
 uniform vec3 camera;
 uniform sampler2D texture;
+uniform sampler2D starfield;
 uniform vec3 sun;
 
 varying vec3 direction;
@@ -82,7 +83,8 @@ void main() {
     vec4 col = textureSphere(texture, n);
     gl_FragColor = vec4(shade * col.xyz, col.w);
   } else {
-    gl_FragColor = vec4(0.,0.,0.,1.);
+    gl_FragColor = textureSphere(starfield, direction);
+    // gl_FragColor = vec4(0.,0.,0.,1.);
   }
 
 }

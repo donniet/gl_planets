@@ -11,6 +11,8 @@ find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(Boost ${BOOST_VERSION} COMPONENTS program_options REQUIRED )
 
+include_directories(include)
+
 add_executable(gl_planets src/main.cpp)
 
 target_include_directories(gl_planets PRIVATE ${Boost_INCLUDE_DIR} ${GLEW_INCLUDE_DIRS} ${OPENGL_INCLUDE_DIR})

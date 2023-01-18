@@ -11,7 +11,6 @@
 #include <glm/ext/matrix_clip_space.hpp> // glm::perspective
 #include <glm/ext/scalar_constants.hpp> // glm::pi
 
-#include <stb/stb_image.h>
 
 #include <iostream>
 #include <fstream>
@@ -27,6 +26,8 @@ using std::string;
 using std::pair;
 using std::tie;
 using std::make_pair;
+
+#include "texture.hpp"
 
 #include <boost/program_options.hpp>
 using namespace boost::program_options;
@@ -143,22 +144,16 @@ int main(int ac, char * av[]) {
 		return 0;
 	}
 
-	int texture_width, texture_height, texture_channels;
-	unsigned char * image = stbi_load(texture_path.c_str(), &texture_width, &texture_height, &texture_channels, 3);
-	if(image == nullptr) {
+	Texture io_texture(texture_path);
+	Texture star_texture(starfield_path);
+
+	if(!io_texture) {
 		cerr << "unable to load texture '" << texture_path << "'\n";
 		return -1;
-	} else {
-		cout << "loaded texture '" << texture_path << "' " << texture_width << "x" << texture_height << "c" << texture_channels << endl;
 	}
-
-	int starfield_width, starfield_height, starfield_channels;
-	unsigned char * starfield = stbi_load(starfield_path.c_str(), &starfield_width, &starfield_height, &starfield_channels, 3);
-	if(starfield == nullptr) {
+	if(!star_texture) {
 		cerr << "unable to load starfield '" << starfield_path << "'\n";
 		return -1;
-	} else {
-		cout << "loaded starfield '" << starfield_path << "' " << starfield_width << "x" << starfield_height << "c" << starfield_channels << endl;
 	}
 
 	// convert to radians
@@ -246,7 +241,7 @@ int main(int ac, char * av[]) {
 	glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
 	glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texture_width, texture_height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, io_texture.width(), io_texture.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, io_texture.data());
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -260,7 +255,7 @@ int main(int ac, char * av[]) {
 	glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
 	glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, starfield_width, starfield_height, 0, GL_RGB, GL_UNSIGNED_BYTE, starfield);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, star_texture.width(), star_texture.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, star_texture.data());
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -305,7 +300,7 @@ int main(int ac, char * av[]) {
 		glm::mat4 view = glm::identity<glm::mat4>();
 
 		view = glm::translate(view, glm::vec3(0, 0, -2));
-		view = glm::rotate(view, (float)time_now / (float)1200., glm::vec3(0, 1, 0));
+		view = glm::rotate(view, (float)time_now / (float)120., glm::vec3(0, 1, 0));
 
 		glm::mat4 mv = projection * view * m;
 		mv = glm::inverse(mv);
@@ -318,9 +313,9 @@ int main(int ac, char * av[]) {
 		// cout << "camera: " << camera.x << " " << camera.y << " " << camera.z << " " << camera.w << endl;
 
 		glm::vec3 sun = glm::vec3(
-			glm::cos((float)time_now / (float)6000.), 
+			glm::cos((float)time_now / (float)600.), 
 			0.,
-			-glm::sin((float)time_now / (float)6000.));
+			-glm::sin((float)time_now / (float)600.));
 
 
 		glUseProgram(prog);
@@ -366,10 +361,6 @@ int main(int ac, char * av[]) {
 	
 	glfwDestroyWindow(window);
 	glfwTerminate();
-
-    stbi_image_free(image);
-
-	
 
     return 0;    
 }

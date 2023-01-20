@@ -1,15 +1,3 @@
-#define GLEW_STATIC
-#include <GL/glew.h>
-
-#define GLFW_INCLUDE_ES
-#include <GLFW/glfw3.h>
-
-#include <glm/vec3.hpp> // glm::vec3
-#include <glm/vec4.hpp> // glm::vec4
-#include <glm/mat4x4.hpp> // glm::mat4
-#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
-#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
-#include <glm/ext/scalar_constants.hpp> // glm::pi
 
 
 #include <iostream>
@@ -18,6 +6,7 @@
 #include <utility>
 #include <tuple>
 #include <memory>
+#include <map>
 
 using std::cout;
 using std::cerr;
@@ -26,11 +15,47 @@ using std::string;
 using std::pair;
 using std::tie;
 using std::make_pair;
+using std::unique_ptr;
+using std::shared_ptr;
+using std::map;
 
-#include "texture.hpp"
+#include "gl.hpp"
 
 #include <boost/program_options.hpp>
 using namespace boost::program_options;
+
+std::vector<std::string> GetFirstNMessages(GLuint numMsgs = 100)
+{
+	GLint maxMsgLen = 0;
+	glGetIntegerv(GL_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
+
+	std::vector<GLchar> msgData(numMsgs * maxMsgLen);
+	std::vector<GLenum> sources(numMsgs);
+	std::vector<GLenum> types(numMsgs);
+	std::vector<GLenum> severities(numMsgs);
+	std::vector<GLuint> ids(numMsgs);
+	std::vector<GLsizei> lengths(numMsgs);
+
+	GLuint numFound = glGetDebugMessageLog(numMsgs, msgData.size(), &sources[0], &types[0], &ids[0], &severities[0], &lengths[0], &msgData[0]);
+
+	sources.resize(numFound);
+	types.resize(numFound);
+	severities.resize(numFound);
+	ids.resize(numFound);
+	lengths.resize(numFound);
+
+	std::vector<std::string> messages;
+	messages.reserve(numFound);
+
+	std::vector<GLchar>::iterator currPos = msgData.begin();
+	for(size_t msg = 0; msg < lengths.size(); ++msg)
+	{
+		messages.push_back(std::string(currPos, currPos + lengths[msg] - 1));
+		currPos = currPos + lengths[msg];
+	}
+
+	return messages;
+}
 
 string infoLog(GLuint obj) {
 	int log_size = 0;
@@ -119,11 +144,26 @@ pair<bool,GLuint> program_from_shader_files(string vertex_path, string fragment_
 void error_callback(int error, const char * desc) {
 	cerr << "ERROR: " << desc << "\n";
 }
+void GLAPIENTRY
+MessageCallback( GLenum source,
+                 GLenum type,
+                 GLuint id,
+                 GLenum severity,
+                 GLsizei length,
+                 const GLchar* message,
+                 const void* userParam )
+{
+  fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
+            type, severity, message );
+}
+
+
 
 int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
 	string fragment_shader = "../shaders/sphere_frag.glsl";
-	string texture_path = "../img/iomoon.jpg";
+	string texture_path = "../img/marsb.jpg";
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
 	float fieldOfView = 60., near = 1., far = 10.;
 
@@ -144,17 +184,6 @@ int main(int ac, char * av[]) {
 		return 0;
 	}
 
-	Texture io_texture(texture_path);
-	Texture star_texture(starfield_path);
-
-	if(!io_texture) {
-		cerr << "unable to load texture '" << texture_path << "'\n";
-		return -1;
-	}
-	if(!star_texture) {
-		cerr << "unable to load starfield '" << starfield_path << "'\n";
-		return -1;
-	}
 
 	// convert to radians
 	fieldOfView *= glm::pi<float>() / 180.;
@@ -217,10 +246,34 @@ int main(int ac, char * av[]) {
 
 	glfwSwapInterval(1);
 
+
+	Texture io_texture(texture_path);
+	Texture star_texture(starfield_path);
+
+	if(!io_texture) {
+		cerr << "unable to load texture '" << texture_path << "'\n";
+		return -1;
+	}
+	if(!star_texture) {
+		cerr << "unable to load starfield '" << starfield_path << "'\n";
+		return -1;
+	}
+
 	GLuint prog;
 	bool success;
 	tie(success, prog) = program_from_shader_files(vertex_shader, fragment_shader);
 	if(!success) return -1;
+
+
+	Program program;
+	tie(program, success) = Program::from_shader_files(vertex_shader, fragment_shader);
+	if(!success) {
+		std::cerr << "error making program" << std::endl;
+	}
+
+	// During init, enable debug output
+	glEnable              ( GL_DEBUG_OUTPUT );
+	glDebugMessageCallback( MessageCallback, 0 );
 
 	auto corner_location = glGetAttribLocation(prog, "corner");
 	auto inv_location = glGetUniformLocation(prog, "inv");
@@ -228,6 +281,13 @@ int main(int ac, char * av[]) {
 	auto texture_location = glGetUniformLocation(prog, "texture");
 	auto starfield_location = glGetUniformLocation(prog, "starfield");
 	auto sun_location = glGetUniformLocation(prog, "sun");
+
+	std::cout << "inv_location: " << inv_location << std::endl;
+	std::cout << "corner_location: " << corner_location << std::endl;
+	std::cout << "camera_location: " << camera_location << std::endl;
+	std::cout << "texture_location: " << texture_location << std::endl;
+	std::cout << "starfield_location: " << starfield_location << std::endl;
+	std::cout << "sun_location: " << sun_location << std::endl;
 
 	// handle resize
 	glm::mat4 projection = glm::perspective(fieldOfView, (float)mode->width / (float)mode->height, near, far);
@@ -274,7 +334,7 @@ int main(int ac, char * av[]) {
 	time_of_last_swap = time_of_first_swap;
 
 	// setup buffers
-	GLuint corners_buffer;
+	GLuint corners_buffer_old;	
 
 	float corners[] = {
 		-1, -1,
@@ -283,10 +343,12 @@ int main(int ac, char * av[]) {
 		-1, 1
 	};
 
-	glGenBuffers(1, &corners_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, corners_buffer);
+	glGenBuffers(1, &corners_buffer_old);
+	glBindBuffer(GL_ARRAY_BUFFER, corners_buffer_old);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
 
+	ArrayBuffer<float,2> corners_buffer(sizeof(corners)/sizeof(float), corners);
+		
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -317,9 +379,12 @@ int main(int ac, char * av[]) {
 			0.,
 			-glm::sin((float)time_now / (float)600.));
 
-
+#if 1
 		glUseProgram(prog);
 		glEnableVertexAttribArray(corner_location);
+		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer_old);
+		glVertexAttribPointer(corner_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+		
 		glUniformMatrix4fv(inv_location, 1, GL_FALSE, &mv[0][0]);
 		glUniform3fv(camera_location, 1, &camera[0]);
 		glUniform3fv(sun_location, 1, &sun[0]);
@@ -332,22 +397,41 @@ int main(int ac, char * av[]) {
 		glBindTexture(GL_TEXTURE_2D, starfield_id);
 		glUniform1i(starfield_location, 1);
 
-		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer);
-		glVertexAttribPointer(corner_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		
 
 		glDisableVertexAttribArray(corner_location);
+#else
+		UniformMatrix<float,4> inverse_transform(mv);
+		Uniform<float,3> camera_position(camera);
+		Uniform<float,3> sun_position(sun);
 
 
-		
+		program.draw_arrays_triangle_fan(
+			make_param("camera", camera_position ),
+			make_param("texture", io_texture ),
+			make_param("starfield", star_texture ),
+			make_param("sun", sun_position ),
+			make_param("inv", inverse_transform ),
+			make_param("corner", corners_buffer )
+		);
+#endif		
 		/* Display framebuffer */
 		glfwSwapBuffers(window);
+		
+		std::vector<string> messages = GetFirstNMessages();
+		for(string s : messages) {
+			std::cout << s << std::endl;
+		}
+
 		
 		/* Update fps counter */
 		time_now = glfwGetTime();
 		printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
 		time_of_last_swap = time_now;
 		++n_frames;
+
+		break;	
 	}
 
 	printf("%zu frames in %gs = %.1fHz\n",

@@ -198,6 +198,9 @@ template<typename T> Param<T> make_param(string name, T & value) {
 template<typename ... Ts>
 struct draw_arrays_helper;
 
+template<typename ... Ts>
+struct drawer;
+
 class Program {
 private:
 	GLuint program_;
@@ -242,6 +245,9 @@ public:
 
 		return make_pair(ret, true);
 	}
+
+	template<typename ... Ts>
+	drawer<Ts...> drawer(Param<Ts> ... params);
 
 	template<typename ... Ts>
 	void draw_arrays_triangle_fan(Param<Ts> ... params);
@@ -290,7 +296,7 @@ class ArrayBuffer {
 
 	GLuint buffer_;
 	size_t count_;
-	void * data_;
+	void const * data_;
 protected:
 public:
 	operator GLuint() const { return buffer_; }
@@ -298,12 +304,17 @@ public:
 	typedef T value_type;
 	static constexpr size_t size = siz;
 
-	ArrayBuffer(size_t count, T * first) 
+	template<size_t length>
+	ArrayBuffer(T (&data)[length]) : 
+		ArrayBuffer(length, data) 
+	{ }
+	ArrayBuffer(size_t count, T const * first) 
 		: count_(count), data_(first)
 	{
 		glGenBuffers(1, &buffer_);
 		glBindBuffer(GL_ARRAY_BUFFER, buffer_);
-		glBufferData(GL_ARRAY_BUFFER, count_ * sizeof(T), data_, GL_STATIC_DRAW);
+		// ensure size parameter is bytes
+		glBufferData(GL_ARRAY_BUFFER, count_ * sizeof(T), static_cast<void const *>(data_), GL_STATIC_DRAW);
 	}
 	ArrayBuffer(ArrayBuffer && rhs) 
 		: buffer_(rhs.buffer_), count_(rhs.count_), data_(rhs.data_)
@@ -384,6 +395,7 @@ struct draw_arrays_helper<UniformMatrix<T,siz>, Ts...>
 		Base::draw_arrays(type);
 	}
 };
+
 
 template<typename T, size_t siz, typename ... Ts>
 struct draw_arrays_helper<Uniform<T,siz>, Ts...> 
@@ -468,12 +480,28 @@ template<> struct draw_arrays_helper<> {
 
 
 template<typename ... Ts>
+struct drawer : public draw_arrays_helper<Ts...> { 
+	typedef draw_arrays_helper<Ts...> Base;
+
+	void draw_arrays_triangle_fan() {
+		Base::begin_draw();
+		Base::draw_arrays(GL_TRIANGLE_FAN);
+	}
+};
+
+template<typename ... Ts>
+drawer<Ts...> Program::drawer(Param<Ts> ... params) {
+	return drawer<Ts...>(params...);
+}
+
+template<typename ... Ts>
 void Program::draw_arrays_triangle_fan(Param<Ts> ... params)
 {
 	draw_arrays_helper<Ts...> helper(*this, params...);
 	helper.begin_draw();
 	helper.draw_arrays(GL_TRIANGLE_FAN);
 }
+
 
 
 

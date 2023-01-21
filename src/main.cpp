@@ -213,8 +213,13 @@ int main(int ac, char * av[]) {
 		-1, 1
 	};
 
-	ArrayBuffer<float,2> corners_buffer(sizeof(corners), corners);
-		
+	glm::mat4 mv;
+	glm::vec4 camera;
+	glm::vec3 sun;
+
+	ArrayBuffer<float,2> corners_buffer(corners);
+	
+	
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -230,21 +235,22 @@ int main(int ac, char * av[]) {
 		view = glm::translate(view, glm::vec3(0, 0, -2));
 		view = glm::rotate(view, (float)time_now / (float)120., glm::vec3(0, 1, 0));
 
-		glm::mat4 mv = projection * view * m;
+		mv = projection * view * m;
 		mv = glm::inverse(mv);
-
-
-		glm::vec4 camera(0, 0, 0, 1);
+		
 		glm::mat4 inv = glm::inverse(view);
-		camera = inv * camera;
+		camera = inv * glm::vec4(0, 0, 0, 1);
 
 		// cout << "camera: " << camera.x << " " << camera.y << " " << camera.z << " " << camera.w << endl;
 
-		glm::vec3 sun = glm::vec3(
+		sun = glm::vec3(
 			glm::cos((float)time_now / (float)600.), 
 			0.,
 			-glm::sin((float)time_now / (float)600.));
 
+		// TODO: figure out how to move this and the other parameter code outside of the main loop
+		// right now if they are moved outside the screen is blank.
+		// i beleive this is because of reference parameters...
 		UniformMatrix<float,4> inverse_transform(mv);
 		Uniform<float,3> camera_position(camera);
 		Uniform<float,3> sun_position(sun);
@@ -257,6 +263,7 @@ int main(int ac, char * av[]) {
 			make_param("inv", inverse_transform ),
 			make_param("corner", corners_buffer )
 		);
+		
 	
 		/* Display framebuffer */
 		glfwSwapBuffers(window);

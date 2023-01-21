@@ -58,7 +58,6 @@ public:
 		if(data_ == nullptr) return;
 
 		glGenTextures(1, &texture_id);
-		std::cout << "glGenTextures(1, &texture_id) == " << texture_id << "; // " << path << std::endl;
 		glBindTexture(GL_TEXTURE_2D, texture_id);
 		// TODO: only apply these packing rules when the width/height of the texture demand it
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -235,8 +234,6 @@ public:
 		glAttachShader(prog, fragment);
 		glLinkProgram(prog);
 
-		std::cout << "created program: " << prog << std::endl;
-
 		Program ret(prog);
 
 		if(!ret.linker_status()) {
@@ -267,12 +264,9 @@ template<> class UniformMatrix<float,4> {
 private:
 	data_type const & data_;
 public:
-	UniformMatrix(data_type const & data) : data_(data) {
-		std::cout << "uniform matrix: " << data_ << std::endl;
-	}
+	UniformMatrix(data_type const & data) : data_(data) {}
 
 	void operator()(GLint location) {
-		std::cout << "glUniformMatrix4fv(" << location << ", 1, GL_FALSE, &data_[0][0]);" << std::endl;
 		glUniformMatrix4fv(location, 1, GL_FALSE, &data_[0][0]);
 	}
 };
@@ -286,7 +280,6 @@ public:
 	Uniform(data_type const & data) : data_(data) {}
 
 	void operator()(GLint location) {
-		std::cout << "glUniform3fv(" << location << ", 1, &data_[0]);" << std::endl;
 		glUniform3fv(location, 1, &data_[0]);
 	}
 };
@@ -308,18 +301,9 @@ public:
 	ArrayBuffer(size_t count, T * first) 
 		: count_(count), data_(first)
 	{
-		std::cout << "buffer: [ ";
-		for(int i = 0; i < count; i++) {
-			std::cout << first[i] << ", ";
-		}
-		std::cout << "]" << std::endl;
-		
 		glGenBuffers(1, &buffer_);
-		std::cout << "glGenBuffers(1, &buffer_) -> " << buffer_ << std::endl;
-		std::cout << "glBindBuffer(GL_ARRAY_BUFFER, " << buffer_ << ");" << std::endl;
 		glBindBuffer(GL_ARRAY_BUFFER, buffer_);
-		std::cout << "glBufferData(GL_ARRAY_BUFFER, " << count_ << ", " << std::hex << data_ << ", GL_STATIC_DRAW);" << std::endl;
-		glBufferData(GL_ARRAY_BUFFER, count_, data_, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, count_ * sizeof(T), data_, GL_STATIC_DRAW);
 	}
 	ArrayBuffer(ArrayBuffer && rhs) 
 		: buffer_(rhs.buffer_), count_(rhs.count_), data_(rhs.data_)
@@ -361,11 +345,8 @@ struct draw_arrays_helper<ArrayBuffer<T,siz>, Ts...>
 	{ }
 
 	inline void draw_arrays(GLenum type) {
-		std::cout << "glEnableVertexAttribArray(" << loc_ << ");" << std::endl;
 		glEnableVertexAttribArray(loc_);
-		std::cout << "glBindBuffer(GL_ARRAY_BUFFER, " << buffer_ << ");" << std::endl;
 		glBindBuffer(GL_ARRAY_BUFFER, buffer_);
-		std::cout << "glVertexAttribPointer(" << loc_ << ", " << siz << ", 0x" << std::hex << gl_type<T>::value << ", GL_FALSE, 0, nullptr);" << std::endl;
 		glVertexAttribPointer(loc_, siz, gl_type<T>::value, GL_FALSE, 0, nullptr);
 		// set the vertex count in the leaf class
 		Base::set_vertex_count(buffer_.vertex_count());
@@ -374,7 +355,6 @@ struct draw_arrays_helper<ArrayBuffer<T,siz>, Ts...>
 	}
 
 	~draw_arrays_helper() {
-		std::cout << "glDisableVertexAttribArray(" << loc_ << ");" << std::endl;
 		glDisableVertexAttribArray(loc_);
 	}
 };
@@ -449,11 +429,8 @@ struct draw_arrays_helper<Texture, Ts...>
 	{ }
 
 	inline void draw_arrays(GLenum type) {
-		std::cout << "glActiveTexture(GL_TEXTURE" << texture_label_ << ");" << std::endl;
 		glActiveTexture(GL_TEXTURE0 + texture_label_);
-		std::cout << "glBindTexture(GL_TEXTURE_2D, " << (GLuint)texture_ << ");" << std::endl;
 		glBindTexture(GL_TEXTURE_2D, texture_ );
-		std::cout << "glUniform1i(" << texture_location_ << ", " << texture_label_ << ");" << std::endl;
 		glUniform1i(texture_location_, texture_label_);
 
 		Base::draw_arrays(type);
@@ -467,22 +444,18 @@ template<> struct draw_arrays_helper<> {
 
 	GLuint get_attrib_location(string name) const {
 		auto loc = glGetAttribLocation(prog_, name.c_str());
-		std::cout << "glGetAttribLocation(" << prog_ << ", " << name << ") == " << loc << ";" << std::endl;
 
 		return loc;
 	};
 	GLuint get_uniform_location(string name) const {
 		auto loc = glGetUniformLocation(prog_, name.c_str());
-		std::cout << "glGetUniformLocation(" << prog_ << ", " << name << ") == " << loc << ";" << std::endl;
 		
 		return loc;
 	}
 	inline void begin_draw() {
-		std::cout << "glUseProgram(" << (GLuint)prog_ << ");" << std::endl;
 		glUseProgram(prog_);
 	}
 	inline void draw_arrays(GLenum type) {
-		std::cout << "glDrawArrays(GL_TRIANGLE_FAN, 0, " << vertex_count_ << ");" << std::endl;
 		glDrawArrays(type, 0, vertex_count_);
 	}
 	size_t allocate_texture() { return texture_count_++; }

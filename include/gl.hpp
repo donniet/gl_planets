@@ -23,6 +23,8 @@
 #include <map>
 #include <exception>
 #include <sstream>
+#include <functional>
+#include <vector>
 
 // for debugging
 #include <iostream>
@@ -35,6 +37,8 @@ using std::unique_ptr;
 using std::ifstream;
 using std::map;
 using std::tie;
+using std::vector;
+using std::function;
 
 class Texture {
 private:
@@ -356,7 +360,7 @@ struct draw_arrays_helper<ArrayBuffer<T,siz>, Ts...>
 		buffer_(param.value)
 	{ }
 
-	void draw_arrays(GLenum type) {
+	inline void draw_arrays(GLenum type) {
 		std::cout << "glEnableVertexAttribArray(" << loc_ << ");" << std::endl;
 		glEnableVertexAttribArray(loc_);
 		std::cout << "glBindBuffer(GL_ARRAY_BUFFER, " << buffer_ << ");" << std::endl;
@@ -370,7 +374,7 @@ struct draw_arrays_helper<ArrayBuffer<T,siz>, Ts...>
 	}
 
 	~draw_arrays_helper() {
-		std::cout << "Disabling vertex attrib array." << std::endl;
+		std::cout << "glDisableVertexAttribArray(" << loc_ << ");" << std::endl;
 		glDisableVertexAttribArray(loc_);
 	}
 };
@@ -391,9 +395,10 @@ struct draw_arrays_helper<UniformMatrix<T,siz>, Ts...>
 		uniform_location_(Base::get_uniform_location(param.name)),
 		name_(param.name),
 		uniform_matrix_(param.value)
-	{ }
+	{ 
+	}
 
-	void draw_arrays(GLenum type) {
+	inline void draw_arrays(GLenum type) {
 		uniform_matrix_(uniform_location_);
 
 		Base::draw_arrays(type);
@@ -417,7 +422,7 @@ struct draw_arrays_helper<Uniform<T,siz>, Ts...>
 		uniform_(param.value)
 	{ }
 
-	void draw_arrays(GLenum type) {
+	inline void draw_arrays(GLenum type) {
 		uniform_(uniform_location_);
 
 		Base::draw_arrays(type);
@@ -443,7 +448,7 @@ struct draw_arrays_helper<Texture, Ts...>
 		texture_(param.value)
 	{ }
 
-	void draw_arrays(GLenum type) {
+	inline void draw_arrays(GLenum type) {
 		std::cout << "glActiveTexture(GL_TEXTURE" << texture_label_ << ");" << std::endl;
 		glActiveTexture(GL_TEXTURE0 + texture_label_);
 		std::cout << "glBindTexture(GL_TEXTURE_2D, " << (GLuint)texture_ << ");" << std::endl;
@@ -472,8 +477,11 @@ template<> struct draw_arrays_helper<> {
 		
 		return loc;
 	}
-
-	void draw_arrays(GLenum type) {
+	inline void begin_draw() {
+		std::cout << "glUseProgram(" << (GLuint)prog_ << ");" << std::endl;
+		glUseProgram(prog_);
+	}
+	inline void draw_arrays(GLenum type) {
 		std::cout << "glDrawArrays(GL_TRIANGLE_FAN, 0, " << vertex_count_ << ");" << std::endl;
 		glDrawArrays(type, 0, vertex_count_);
 	}
@@ -482,10 +490,7 @@ template<> struct draw_arrays_helper<> {
 
 	draw_arrays_helper(Program & prog) 
 		: prog_(prog), vertex_count_(0), texture_count_(0)
-	{ 
-		std::cout << "glUseProgram(" << (GLuint)prog_ << ");" << std::endl;
-		glUseProgram(prog_);
-	}
+	{ }
 };
 
 
@@ -493,6 +498,7 @@ template<typename ... Ts>
 void Program::draw_arrays_triangle_fan(Param<Ts> ... params)
 {
 	draw_arrays_helper<Ts...> helper(*this, params...);
+	helper.begin_draw();
 	helper.draw_arrays(GL_TRIANGLE_FAN);
 }
 

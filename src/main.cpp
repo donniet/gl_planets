@@ -272,7 +272,8 @@ int main(int ac, char * av[]) {
 	}
 
 	// During init, enable debug output
-	glEnable              ( GL_DEBUG_OUTPUT );
+	glEnable( GL_DEBUG_OUTPUT );
+	// glDebugMessageControl(GL_DEBUG_SOURCE_API​, 0​, GL_DEBUG_SEVERITY_NOTIFICATION​, 0​, nullptr​, GL_TRUE​);
 	glDebugMessageCallback( MessageCallback, 0 );
 
 	auto corner_location = glGetAttribLocation(prog, "corner");
@@ -347,7 +348,7 @@ int main(int ac, char * av[]) {
 	glBindBuffer(GL_ARRAY_BUFFER, corners_buffer_old);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
 
-	ArrayBuffer<float,2> corners_buffer(sizeof(corners)/sizeof(float), corners);
+	ArrayBuffer<float,2> corners_buffer(sizeof(corners), corners);
 		
 
 	while (!glfwWindowShouldClose(window))
@@ -379,11 +380,8 @@ int main(int ac, char * av[]) {
 			0.,
 			-glm::sin((float)time_now / (float)600.));
 
-#if 1
+#if 0
 		glUseProgram(prog);
-		glEnableVertexAttribArray(corner_location);
-		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer_old);
-		glVertexAttribPointer(corner_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 		
 		glUniformMatrix4fv(inv_location, 1, GL_FALSE, &mv[0][0]);
 		glUniform3fv(camera_location, 1, &camera[0]);
@@ -397,6 +395,10 @@ int main(int ac, char * av[]) {
 		glBindTexture(GL_TEXTURE_2D, starfield_id);
 		glUniform1i(starfield_location, 1);
 
+		glEnableVertexAttribArray(corner_location);
+		glBindBuffer(GL_ARRAY_BUFFER, corners_buffer_old);
+		glVertexAttribPointer(corner_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+		
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 		
 
@@ -415,6 +417,7 @@ int main(int ac, char * av[]) {
 			make_param("inv", inverse_transform ),
 			make_param("corner", corners_buffer )
 		);
+
 #endif		
 		/* Display framebuffer */
 		glfwSwapBuffers(window);
@@ -431,7 +434,7 @@ int main(int ac, char * av[]) {
 		time_of_last_swap = time_now;
 		++n_frames;
 
-		break;	
+		// break;	
 	}
 
 	printf("%zu frames in %gs = %.1fHz\n",

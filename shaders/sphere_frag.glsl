@@ -72,22 +72,21 @@ bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec
 }
 
 void main() {
-  // gl_FragColor = vec4(0., 0., 1., 1.);
+  // gl_FragColor = vec4(1., 0., 0., 1.);
   // return;
-  
+
   vec3 inter = vec3(0.,0.,0.);
   vec3 n = vec3(0., 0., 0.);
   vec3 center = vec3(0., 0., 0.);
   if (rayIntersectsSphere(camera, direction, center, 1., inter, n)) {
-    // gl_FragColor = vec4(1., 0., 0., 1.);
-    // return;
-
     float shade = max(dot(sun, n), 0.) + 0.05;
     vec4 col = textureSphere(texture, n);
     gl_FragColor = vec4(shade * col.xyz, col.w);
+    // gl_FragColor = vec4(1., 0., 0., 1.);
+    return;
   } else {
     gl_FragColor = textureSphere(starfield, direction);
-    gl_FragColor = vec4(0.,1.,0.,1.);
+    // gl_FragColor = vec4(0.,1.,0.,1.);
   }
 
 }

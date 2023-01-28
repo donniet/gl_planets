@@ -152,13 +152,20 @@ int main(int ac, char * av[]) {
 	glewExperimental = GL_TRUE;
   	glewInit();
 
+	GLint maxTextureUnits;
+	glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+
 	printf("OpenGL info:\n"
 	       "\tVendor   = \"%s\"\n"
 	       "\tRenderer = \"%s\"\n"
-	       "\tVersion  = \"%s\"\n",
+	       "\tVersion  = \"%s\"\n"
+		   "\nMax Texture Units = %d\n",
 	       glGetString(GL_VENDOR),
 	       glGetString(GL_RENDERER),
-	       glGetString(GL_VERSION));
+	       glGetString(GL_VERSION),
+		   maxTextureUnits);
+
+	// return 0;
 
 	glfwSwapInterval(1);
 

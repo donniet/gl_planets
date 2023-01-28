@@ -26,6 +26,7 @@
 #include <functional>
 #include <vector>
 #include <initializer_list>
+#include <algorithm>
 
 // for debugging
 #include <iostream>
@@ -43,6 +44,8 @@ using std::function;
 using std::map;
 using std::tuple;
 using std::initializer_list;
+using std::bind;
+using std::fill;
 
 class Texture {
 private:
@@ -196,6 +199,7 @@ private:
 	vector<function<void()>> param_setters_;
 	GLuint geometry_count_;
 	GLuint texture_count_;
+	vector<GLuint> texture_ids_;
 public:
 	programParameters(Program const & p);
 
@@ -257,7 +261,12 @@ public:
 
 programParameters::programParameters(Program const & p) : 
 	program_(p), geometry_count_(0), texture_count_(0) 
-{ }
+{ 
+	GLint maxTextureUnits;
+	glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+	texture_ids_.resize(maxTextureUnits);
+	fill(texture_ids_.begin(), texture_ids_.end(), 0);
+}
 
 
 template<>
@@ -266,11 +275,13 @@ programParameters & programParameters::operator()<>(string const & name, Texture
 	GLint location = glGetUniformLocation(program_, name.c_str());
 	if(location < 0) return *this;
 
-	param_setters_.push_back([&dat, location, this]() { 
-		glActiveTexture(GL_TEXTURE0 + this->texture_count_);
+	GLuint texture_id = texture_count_++;
+	texture_ids_[location] = texture_id;
+
+	param_setters_.push_back([&dat, location, texture_id]() { 
+		glActiveTexture(GL_TEXTURE0 + texture_id);
 		glBindTexture(GL_TEXTURE_2D, dat);
-		glUniform1i(location, this->texture_count_);
-		texture_count_++;
+		glUniform1i(location, texture_id);
 	});
 	return *this;
 }
@@ -319,9 +330,7 @@ programParameters & programParameters::operator()<>(string const & name, Uniform
 	GLint location = glGetUniformLocation(program_, name.c_str());
 	if(location < 0) return *this;
 
-	param_setters_.push_back([&dat, location]() { 
-		glUniformMatrix4fv(location, 1, GL_FALSE, &dat.data_[0][0]);
-	});
+	param_setters_.push_back(bind(&UniformMatrix<float,4>::setup_parameter, dat, location));
 	return *this;
 }
 
@@ -349,9 +358,7 @@ programParameters & programParameters::operator()<>(string const & name, Uniform
 	GLint location = glGetUniformLocation(program_, name.c_str());
 	if(location < 0) return *this;
 
-	param_setters_.push_back([&dat, location]() { 
-		glUniform3fv(location, 1, &dat.data_[0]);
-	});
+	param_setters_.push_back(bind(&Uniform<float,3>::setup_parameter, &dat, location));
 	return *this;
 }
 
@@ -425,11 +432,7 @@ programParameters & programParameters::operator()<>(string const & name, ArrayBu
 	if(location < 0) return *this;
 
 	geometry_count_ = dat.geometry_count();
-	param_setters_.push_back([&dat, location]() { 
-		glBindBuffer(GL_ARRAY_BUFFER, dat);
-		glEnableVertexAttribArray(location);
-		glVertexAttribPointer(location, 2, GL_FLOAT, GL_FALSE, 0, nullptr); 
-	});
+	param_setters_.push_back(bind(&ArrayBuffer<float,2>::setup_parameter, &dat, location));
 	return *this;
 }
 

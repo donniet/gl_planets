@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 set(BOOST_VERSION 1.71.0)
+set(CMAKE_CXX_STANDARD 20)
 
 project("gl_planets" VERSION 0.1 LANGUAGES C CXX)
 

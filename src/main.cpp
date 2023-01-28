@@ -79,7 +79,7 @@ MessageCallback( GLenum source,
 int main(int ac, char * av[]) {
 	string vertex_shader = "../shaders/sphere_vert.glsl";
 	string fragment_shader = "../shaders/sphere_frag.glsl";
-	string texture_path = "../img/marsb.jpg";
+	string texture_path = "../img/io-2.jpg";
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
 	float fieldOfView = 60., near = 1., far = 10.;
 
@@ -214,12 +214,22 @@ int main(int ac, char * av[]) {
 	};
 
 	glm::mat4 mv;
-	glm::vec4 camera;
+	glm::vec3 camera;
 	glm::vec3 sun;
 
 	ArrayBuffer<float,2> corners_buffer(corners);
+	UniformMatrix<float,4> inverse_transform(mv);
+	Uniform<float,3> camera_position(camera);
+	Uniform<float,3> sun_position(sun);
 	
-	
+	auto drawer = program.make_drawer()
+		("camera", camera_position )
+		("texture", io_texture )
+		("starfield", star_texture )
+		("sun", sun_position )
+		("inv", inverse_transform )
+		("corner", corners_buffer )
+	;
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -251,18 +261,9 @@ int main(int ac, char * av[]) {
 		// TODO: figure out how to move this and the other parameter code outside of the main loop
 		// right now if they are moved outside the screen is blank.
 		// i beleive this is because of reference parameters...
-		UniformMatrix<float,4> inverse_transform(mv);
-		Uniform<float,3> camera_position(camera);
-		Uniform<float,3> sun_position(sun);
 
-		program.draw_arrays_triangle_fan(
-			make_param("camera", camera_position ),
-			make_param("texture", io_texture ),
-			make_param("starfield", star_texture ),
-			make_param("sun", sun_position ),
-			make_param("inv", inverse_transform ),
-			make_param("corner", corners_buffer )
-		);
+
+		drawer.draw_arrays_triangle_fan();
 		
 	
 		/* Display framebuffer */

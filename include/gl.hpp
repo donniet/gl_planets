@@ -25,6 +25,7 @@
 #include <sstream>
 #include <functional>
 #include <vector>
+#include <initializer_list>
 
 // for debugging
 #include <iostream>
@@ -39,6 +40,9 @@ using std::map;
 using std::tie;
 using std::vector;
 using std::function;
+using std::map;
+using std::tuple;
+using std::initializer_list;
 
 class Texture {
 private:
@@ -183,6 +187,7 @@ public:
 	}		
 };
 
+class Program;
 
 template<typename T> struct Param 
 {
@@ -201,10 +206,26 @@ struct draw_arrays_helper;
 template<typename ... Ts>
 struct drawer;
 
+
+class programParameters {
+private:
+	Program const & program_;
+	vector<function<void()>> param_setters_;
+	GLuint geometry_count_;
+	GLuint texture_count_;
+public:
+	programParameters(Program const & p);
+
+	template<typename T>
+	programParameters & operator()(string const & name, T const & dat);
+
+	void draw_arrays_triangle_fan();
+};
+
+
 class Program {
 private:
 	GLuint program_;
-	map<string,GLint> locations_;
 public:
 	Program(GLuint program) : program_(program) {}
 	operator GLuint() const { return program_; }
@@ -246,12 +267,43 @@ public:
 		return make_pair(ret, true);
 	}
 
-	template<typename ... Ts>
-	drawer<Ts...> drawer(Param<Ts> ... params);
+	programParameters make_drawer() { 
+		return programParameters(*this); 
+	}
 
 	template<typename ... Ts>
 	void draw_arrays_triangle_fan(Param<Ts> ... params);
+
 };
+
+programParameters::programParameters(Program const & p) : 
+	program_(p), geometry_count_(0), texture_count_(0) 
+{ }
+
+
+template<>
+programParameters & programParameters::operator()<>(string const & name, Texture const & dat) 
+{
+	GLint location = glGetUniformLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	param_setters_.push_back([&dat, location, this]() { 
+		glActiveTexture(GL_TEXTURE0 + this->texture_count_);
+		glBindTexture(GL_TEXTURE_2D, dat);
+		glUniform1i(location, this->texture_count_);
+		texture_count_++;
+	});
+	return *this;
+}
+
+
+void programParameters::draw_arrays_triangle_fan() {
+	glUseProgram(program_);
+	for(auto const & p : param_setters_) {
+		p();
+	}
+	glDrawArrays(GL_TRIANGLE_FAN, 0, geometry_count_);
+}
 
 std::ostream & operator<<(std::ostream & os, glm::mat4 const & mat) {
 	std::cout << "[\n";
@@ -267,6 +319,7 @@ std::ostream & operator<<(std::ostream & os, glm::mat4 const & mat) {
 template<typename T, size_t siz> class UniformMatrix;
 template<> class UniformMatrix<float,4> {
 	typedef glm::mat4 data_type;
+	friend class programParameters;
 private:
 	data_type const & data_;
 public:
@@ -275,11 +328,28 @@ public:
 	void operator()(GLint location) {
 		glUniformMatrix4fv(location, 1, GL_FALSE, &data_[0][0]);
 	}
+	void setup_parameter(GLint location) const {
+		glUniformMatrix4fv(location, 1, GL_FALSE, &data_[0][0]);
+	}
 };
+
+
+template<>
+programParameters & programParameters::operator()<>(string const & name, UniformMatrix<float,4> const & dat) 
+{
+	GLint location = glGetUniformLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	param_setters_.push_back([&dat, location]() { 
+		glUniformMatrix4fv(location, 1, GL_FALSE, &dat.data_[0][0]);
+	});
+	return *this;
+}
 
 template<typename T, size_t siz> class Uniform;
 template<> class Uniform<float,3> {
 	typedef glm::vec3 data_type;
+	friend class programParameters;
 private:
 	data_type const & data_;
 public:
@@ -288,7 +358,26 @@ public:
 	void operator()(GLint location) {
 		glUniform3fv(location, 1, &data_[0]);
 	}
+	void setup_parameter(GLint location) const {
+		glUniform3fv(location, 1, &data_[0]);
+	}
 };
+
+
+template<>
+programParameters & programParameters::operator()<>(string const & name, Uniform<float,3> const & dat) 
+{
+	GLint location = glGetUniformLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	param_setters_.push_back([&dat, location]() { 
+		glUniform3fv(location, 1, &dat.data_[0]);
+	});
+	return *this;
+}
+
+template<typename T> struct gl_type {};
+template<> struct gl_type<float> { static const GLenum value = GL_FLOAT; };
 
 template<typename T, size_t siz>
 class ArrayBuffer {
@@ -302,7 +391,7 @@ public:
 	operator GLuint() const { return buffer_; }
 
 	typedef T value_type;
-	static constexpr size_t size = siz;
+	static constexpr size_t width = siz;
 
 	template<size_t length>
 	ArrayBuffer(T (&data)[length]) : 
@@ -329,13 +418,49 @@ public:
 
 		glDeleteBuffers(1, &buffer_);
 	}
-	size_t vertex_count() const {
+	size_t geometry_count() const {
 		return count_ / siz;
+	}
+	GLuint size() const {
+		return count_ * sizeof(T);
+	}
+	GLenum type() const {
+		return gl_type<T>::value;
+	}
+	const void * data() const {
+		return data_;
+	}
+
+	void setup_parameter(GLint location) const {
+		glBindBuffer(GL_ARRAY_BUFFER, buffer_);
+		glEnableVertexAttribArray(location);
+		glVertexAttribPointer(location, width, type(), GL_FALSE, 0, 0);
 	}
 };
 
-template<typename T> struct gl_type {};
-template<> struct gl_type<float> { static const GLenum value = GL_FLOAT; };
+
+template<>
+programParameters & programParameters::operator()<>(string const & name, ArrayBuffer<float,2> const & dat) 
+{
+	GLint location = glGetAttribLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	geometry_count_ = dat.geometry_count();
+	param_setters_.push_back([&dat, location]() { 
+		glBindBuffer(GL_ARRAY_BUFFER, dat);
+		glEnableVertexAttribArray(location);
+		glVertexAttribPointer(location, 2, GL_FLOAT, GL_FALSE, 0, nullptr); 
+	});
+	return *this;
+}
+
+
+template<typename ... Ts>
+struct drawer {
+	Program & prog;
+	tuple<Param<Ts>...> params;
+	void draw_arrays_triangle_fan();
+};
 
 
 template<typename T, size_t siz, typename ... Ts>
@@ -479,20 +604,16 @@ template<> struct draw_arrays_helper<> {
 };
 
 
-template<typename ... Ts>
-struct drawer : public draw_arrays_helper<Ts...> { 
-	typedef draw_arrays_helper<Ts...> Base;
+// template<typename ... Ts>
+// struct drawer : public draw_arrays_helper<Ts...> { 
+// 	typedef draw_arrays_helper<Ts...> Base;
 
-	void draw_arrays_triangle_fan() {
-		Base::begin_draw();
-		Base::draw_arrays(GL_TRIANGLE_FAN);
-	}
-};
+// 	void draw_arrays_triangle_fan() {
+// 		Base::begin_draw();
+// 		Base::draw_arrays(GL_TRIANGLE_FAN);
+// 	}
+// };
 
-template<typename ... Ts>
-drawer<Ts...> Program::drawer(Param<Ts> ... params) {
-	return drawer<Ts...>(params...);
-}
 
 template<typename ... Ts>
 void Program::draw_arrays_triangle_fan(Param<Ts> ... params)

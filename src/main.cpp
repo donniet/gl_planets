@@ -81,7 +81,7 @@ int main(int ac, char * av[]) {
 	string fragment_shader = "../shaders/sphere_frag.glsl";
 	string texture_path = "../img/io-2.jpg";
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
-	float fieldOfView = 60., near = 1., far = 10.;
+	float fieldOfView = 90., near = 1., far = 10.;
 
 	options_description desc("options");
 	desc.add_options()
@@ -242,7 +242,7 @@ int main(int ac, char * av[]) {
 		glm::mat4 m = glm::identity<glm::mat4>();
 		glm::mat4 view = glm::identity<glm::mat4>();
 
-		view = glm::translate(view, glm::vec3(0, 0, -2));
+		view = glm::translate(view, glm::vec3(0, 0, -1.5));
 		view = glm::rotate(view, (float)time_now / (float)120., glm::vec3(0, 1, 0));
 
 		mv = projection * view * m;
@@ -257,11 +257,6 @@ int main(int ac, char * av[]) {
 			glm::cos((float)time_now / (float)600.), 
 			0.,
 			-glm::sin((float)time_now / (float)600.));
-
-		// TODO: figure out how to move this and the other parameter code outside of the main loop
-		// right now if they are moved outside the screen is blank.
-		// i beleive this is because of reference parameters...
-
 
 		drawer.draw_arrays_triangle_fan();
 		

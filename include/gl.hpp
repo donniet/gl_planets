@@ -189,23 +189,6 @@ public:
 
 class Program;
 
-template<typename T> struct Param 
-{
-	string name;
-	T & value; 
-};
-
-template<typename T> Param<T> make_param(string name, T & value) {
-	return Param<T>{name, value};
-}
-
-
-template<typename ... Ts>
-struct draw_arrays_helper;
-
-template<typename ... Ts>
-struct drawer;
-
 
 class programParameters {
 private:
@@ -270,10 +253,6 @@ public:
 	programParameters make_drawer() { 
 		return programParameters(*this); 
 	}
-
-	template<typename ... Ts>
-	void draw_arrays_triangle_fan(Param<Ts> ... params);
-
 };
 
 programParameters::programParameters(Program const & p) : 
@@ -454,174 +433,6 @@ programParameters & programParameters::operator()<>(string const & name, ArrayBu
 	return *this;
 }
 
-
-template<typename ... Ts>
-struct drawer {
-	Program & prog;
-	tuple<Param<Ts>...> params;
-	void draw_arrays_triangle_fan();
-};
-
-
-template<typename T, size_t siz, typename ... Ts>
-struct draw_arrays_helper<ArrayBuffer<T,siz>, Ts...> 
-	: public draw_arrays_helper<Ts...> 
-{
-	GLuint loc_;
-	string name_;
-	ArrayBuffer<T,siz> & buffer_;
-
-	typedef draw_arrays_helper<Ts...> Base;
-
-	draw_arrays_helper(Program & prog, Param<ArrayBuffer<T,siz>> param, Param<Ts> ... params) :
-		draw_arrays_helper<Ts...>(prog, params...), 
-		loc_(Base::get_attrib_location(param.name)),
-		name_(param.name),
-		buffer_(param.value)
-	{ }
-
-	inline void draw_arrays(GLenum type) {
-		glEnableVertexAttribArray(loc_);
-		glBindBuffer(GL_ARRAY_BUFFER, buffer_);
-		glVertexAttribPointer(loc_, siz, gl_type<T>::value, GL_FALSE, 0, nullptr);
-		// set the vertex count in the leaf class
-		Base::set_vertex_count(buffer_.vertex_count());
-
-		Base::draw_arrays(type);
-	}
-
-	~draw_arrays_helper() {
-		glDisableVertexAttribArray(loc_);
-	}
-};
-
-template<typename T, size_t siz, typename ... Ts>
-struct draw_arrays_helper<UniformMatrix<T,siz>, Ts...> 
-	: public draw_arrays_helper<Ts...> 
-{
-	typedef draw_arrays_helper<Ts...> Base;
-
-	GLint uniform_location_;
-	string name_;
-	UniformMatrix<T,siz> & uniform_matrix_;
-
-
-	draw_arrays_helper(Program & prog, Param<UniformMatrix<T,siz>> param, Param<Ts> ... params) :
-		draw_arrays_helper<Ts...>(prog, params...), 
-		uniform_location_(Base::get_uniform_location(param.name)),
-		name_(param.name),
-		uniform_matrix_(param.value)
-	{ 
-	}
-
-	inline void draw_arrays(GLenum type) {
-		uniform_matrix_(uniform_location_);
-
-		Base::draw_arrays(type);
-	}
-};
-
-
-template<typename T, size_t siz, typename ... Ts>
-struct draw_arrays_helper<Uniform<T,siz>, Ts...> 
-	: public draw_arrays_helper<Ts...> 
-{
-	typedef draw_arrays_helper<Ts...> Base;
-
-	GLint uniform_location_;
-	string name_;
-	Uniform<T,siz> & uniform_;
-
-	draw_arrays_helper(Program & prog, Param<Uniform<T,siz>> param, Param<Ts> ... params) :
-		draw_arrays_helper<Ts...>(prog, params...), 
-		uniform_location_(Base::get_uniform_location(param.name)),
-		name_(param.name),
-		uniform_(param.value)
-	{ }
-
-	inline void draw_arrays(GLenum type) {
-		uniform_(uniform_location_);
-
-		Base::draw_arrays(type);
-	}
-};
-
-template<typename ... Ts>
-struct draw_arrays_helper<Texture, Ts...> 
-	: public draw_arrays_helper<Ts...> 
-{
-	typedef draw_arrays_helper<Ts...> Base;
-	GLint texture_location_;
-	size_t texture_label_;
-	string name_;
-	Texture & texture_;
-
-
-	draw_arrays_helper(Program & prog, Param<Texture> param, Param<Ts> ... params) :
-		draw_arrays_helper<Ts...>(prog, params...), 
-		texture_location_(Base::get_uniform_location(param.name)),
-		texture_label_(Base::allocate_texture()),
-		name_(param.name),
-		texture_(param.value)
-	{ }
-
-	inline void draw_arrays(GLenum type) {
-		glActiveTexture(GL_TEXTURE0 + texture_label_);
-		glBindTexture(GL_TEXTURE_2D, texture_ );
-		glUniform1i(texture_location_, texture_label_);
-
-		Base::draw_arrays(type);
-	}
-};
-
-template<> struct draw_arrays_helper<> {
-	Program & prog_;
-	size_t vertex_count_;
-	size_t texture_count_;
-
-	GLuint get_attrib_location(string name) const {
-		auto loc = glGetAttribLocation(prog_, name.c_str());
-
-		return loc;
-	};
-	GLuint get_uniform_location(string name) const {
-		auto loc = glGetUniformLocation(prog_, name.c_str());
-		
-		return loc;
-	}
-	inline void begin_draw() {
-		glUseProgram(prog_);
-	}
-	inline void draw_arrays(GLenum type) {
-		glDrawArrays(type, 0, vertex_count_);
-	}
-	size_t allocate_texture() { return texture_count_++; }
-	void set_vertex_count(size_t count) { vertex_count_ = count; }
-
-	draw_arrays_helper(Program & prog) 
-		: prog_(prog), vertex_count_(0), texture_count_(0)
-	{ }
-};
-
-
-// template<typename ... Ts>
-// struct drawer : public draw_arrays_helper<Ts...> { 
-// 	typedef draw_arrays_helper<Ts...> Base;
-
-// 	void draw_arrays_triangle_fan() {
-// 		Base::begin_draw();
-// 		Base::draw_arrays(GL_TRIANGLE_FAN);
-// 	}
-// };
-
-
-template<typename ... Ts>
-void Program::draw_arrays_triangle_fan(Param<Ts> ... params)
-{
-	draw_arrays_helper<Ts...> helper(*this, params...);
-	helper.begin_draw();
-	helper.draw_arrays(GL_TRIANGLE_FAN);
-}
 
 
 

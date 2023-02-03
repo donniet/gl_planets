@@ -250,7 +250,8 @@ int main(int ac, char * av[]) {
 		glm::mat4 view = glm::identity<glm::mat4>();
 
 		view = glm::translate(view, glm::vec3(0, 0, -1.5));
-		view = glm::rotate(view, (float)time_now / (float)120., glm::vec3(0, 1, 0));
+		view = glm::rotate(view, (float)time_now / (float)43., glm::vec3(0, 0.5, 0.75));
+        // view = glm::rotate(view, (float)time_now / (float)65., glm::vec3(0, 0, 1));
 
 		mv = projection * view * m;
 		mv = glm::inverse(mv);

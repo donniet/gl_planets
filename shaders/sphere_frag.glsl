@@ -11,67 +11,67 @@ varying vec3 direction;
 #define PI 3.14159265359
 
 vec4 textureSphere(sampler2D texture, vec3 p) {
-  vec2 s = vec2(atan(p.x, p.z), -asin(p.y));
-  /* [ \frac{1}{2\pi}, \frac{1}{\pi} ] */
-  s *= vec2(0.1591549430919, 0.31830988618379);
+    vec2 s = vec2(atan(p.x, p.z), -asin(p.y));
+    /* [ \frac{1}{2\pi}, \frac{1}{\pi} ] */
+    s *= vec2(0.1591549430919, 0.31830988618379);
 
-  return texture2D(texture, vec2(s.s + 0.5, s.t + 0.5));
+    return texture2D(texture, vec2(s.s + 0.5, s.t + 0.5));
 }
 
 void swap(inout float a, inout float b) {
-  float c = a;
-  a = b;
-  b = c;
+    float c = a;
+    a = b;
+    b = c;
 }
 
 bool solveQuadratic(float a, float b, float c, out float x0, out float x1, out float discr) {
-  discr = b * b - 4. * a * c;
+    discr = b * b - 4. * a * c;
 
-  if (discr < 0.) return false;
-  
-  if (discr == 0.) {
-    x0 = x1 = -0.5 * b / a;
-  } else {
-    float q;
-    if (b > 0.) {
-      q = -0.5 * (b + sqrt(discr));
+    if (discr < 0.) return false;
+
+    if (discr == 0.) {
+        x0 = x1 = -0.5 * b / a;
     } else {
-      q = -0.5 * (b - sqrt(discr));
+        float q;
+        if (b > 0.) {
+            q = -0.5 * (b + sqrt(discr));
+        } else {
+            q = -0.5 * (b - sqrt(discr));
+        }
+        x0 = q / a;
+        x1 = c / q;
+
+        if (x0 > x1) swap(x0, x1);
     }
-    x0 = q / a;
-    x1 = c / q;
 
-    if (x0 > x1) swap(x0, x1);
-  }
-
-  return true;
+    return true;
 }
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
 bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec3 inter, out vec3 n) {
-  float r2 = radius * radius;
+    float r2 = radius * radius;
 
-  vec3 L = orig - center;
-  float a = dot(dir, dir);
-  float b = 2. * dot(dir, L);
-  float c = dot(L, L) - r2;
+    vec3 L = orig - center;
+    float a = dot(dir, dir);
+    float b = 2. * dot(dir, L);
+    float c = dot(L, L) - r2;
 
-  float t0, t1, discr;
-  solveQuadratic(a, b, c, t0, t1, discr);
+    float t0, t1, discr;
+    solveQuadratic(a, b, c, t0, t1, discr);
 
-  if(discr < 0.) {
-    return false;
-  }
+    if(discr < 0.) {
+        return false;
+    }
 
-  if (t0 < 0.) {
-    t0 = t1;
-    if (t0 < 0.) return false;
-  }
+    if (t0 < 0.) {
+        t0 = t1;
+        if (t0 < 0.) return false;
+    }
 
-  inter = orig + t0 * dir;
-  n = normalize(inter - center);
+    inter = orig + t0 * dir;
+    n = normalize(inter - center);
 
-  return true;
+    return true;
 }
 
 // from https://www.shadertoy.com/view/XlKSDR
@@ -121,10 +121,10 @@ float Fd_Lambert() {
 }
 
 void main() {
-  vec3 inter = vec3(0.,0.,0.);
-  vec3 n = vec3(0., 0., 0.);
-  vec3 center = vec3(0., 0., 0.);
-  vec3 d = normalize(direction);
+    vec3 inter = vec3(0.,0.,0.);
+    vec3 n = vec3(0., 0., 0.);
+    vec3 center = vec3(0., 0., 0.);
+    vec3 d = normalize(direction);
 
     vec3 v = -d;
     vec3 l = normalize(sun);
@@ -138,38 +138,38 @@ void main() {
     float linearRoughness = roughness * roughness;
 
 
-  if (rayIntersectsSphere(camera, d, center, 1., inter, n)) {
-    float NoV = abs(dot(n, v)) + 1e-5;
-    float NoL = saturate(dot(n, l));
-    float NoH = saturate(dot(n, h));
-    float LoH = saturate(dot(l, h));
+    if (rayIntersectsSphere(camera, d, center, 1., inter, n)) {
+        float NoV = abs(dot(n, v)) + 1e-5;
+        float NoL = saturate(dot(n, l));
+        float NoH = saturate(dot(n, h));
+        float LoH = saturate(dot(l, h));
 
-    vec3 baseColor = textureSphere(texture, n).rgb;
-    vec3 diffuseColor = (1.0 - metallic) * baseColor.rgb;
-    vec3 f0 = 0.04 * (1.0 - metallic) + baseColor.rgb * metallic;
+        vec3 baseColor = textureSphere(texture, n).rgb;
+        vec3 diffuseColor = (1.0 - metallic) * baseColor.rgb;
+        vec3 f0 = 0.04 * (1.0 - metallic) + baseColor.rgb * metallic;
 
-    //TODO: add shadows
-    // float attenuation = shadow(vec3(0,0,0), l);
-    float attenuation = 1.0;
+        //TODO: add shadows
+        // float attenuation = shadow(vec3(0,0,0), l);
+        float attenuation = 1.0;
 
-// specular BRDF
-    float D = D_GGX(linearRoughness, NoH, h);
-    float V = V_SmithGGXCorrelated(linearRoughness, NoV, NoL);
-    vec3  F = F_Schlick(f0, LoH);
-    vec3 Fr = (D * V) * F;
-    // diffuse BRDF
-    vec3 Fd = diffuseColor * Fd_Burley(linearRoughness, NoV, NoL, LoH);
+        // specular BRDF
+        float D = D_GGX(linearRoughness, NoH, h);
+        float V = V_SmithGGXCorrelated(linearRoughness, NoV, NoL);
+        vec3  F = F_Schlick(f0, LoH);
+        vec3 Fr = (D * V) * F;
+        // diffuse BRDF
+        vec3 Fd = diffuseColor * Fd_Burley(linearRoughness, NoV, NoL, LoH);
 
-    vec3 color = Fd + Fr;
-    // color *= intensity;
-    color *= (intensity * attenuation * NoL) * vec3(0.98, 0.92, 0.89);
+        vec3 color = Fd + Fr;
+        // color *= intensity;
+        color *= (intensity * attenuation * NoL) * vec3(0.98, 0.92, 0.89);
 
-    // float shade = max(dot(sun, n), 0.) + 0.05;
-    vec4 col = textureSphere(texture, n);
-    gl_FragColor = vec4(color.rgb, 1.0);
-    return;
-  } else {
-    gl_FragColor = textureSphere(starfield, d); 
-  }
+        // float shade = max(dot(sun, n), 0.) + 0.05;
+        vec4 col = textureSphere(texture, n);
+        gl_FragColor = vec4(color.rgb, 1.0);
+       return;
+    } else {
+        gl_FragColor = textureSphere(starfield, d); 
+    }
 
 }

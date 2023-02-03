@@ -81,6 +81,8 @@ int main(int ac, char * av[]) {
 	string fragment_shader = "../shaders/sphere_frag.glsl";
 	string texture_path = "../img/io-2.jpg";
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
+    string dem_path = "../img/io_dem_4096x2048.png";
+    string normal_path = "../img/io_normal_4096x2048.jpg";
 	float fieldOfView = 120., near = 1., far = 10.;
 
 	options_description desc("options");
@@ -91,6 +93,8 @@ int main(int ac, char * av[]) {
 		("fov", value(&fieldOfView), "field of view in degrees")
 		("texture,t", value(&texture_path), "path to texture of planet")
 		("starfield,s", value(&starfield_path), "path to starfield spheremap")
+        ("dem_path", value(&dem_path), "path to DEM")
+        ("normal_path", value(&normal_path), "path to normal map")
 	;
 	variables_map vm;
 	store(parse_command_line(ac, av, desc), vm);
@@ -99,6 +103,8 @@ int main(int ac, char * av[]) {
 		cout << desc << "\n";
 		return 0;
 	}
+
+    notify(vm);
 
 
 	// convert to radians
@@ -172,6 +178,8 @@ int main(int ac, char * av[]) {
 
 	Texture io_texture(texture_path);
 	Texture star_texture(starfield_path);
+    Texture dem_texture(dem_path);
+    Texture normal_texture(normal_path);
 
 	if(!io_texture) {
 		cerr << "unable to load texture '" << texture_path << "'\n";
@@ -187,6 +195,9 @@ int main(int ac, char * av[]) {
 	tie(program, success) = Program::from_shader_files(vertex_shader, fragment_shader);
 	if(!success) {
 		std::cerr << "error making program" << std::endl;
+        std::cerr << "vertex log: " << program.vertex_info_log() << std::endl;
+        std::cerr << "fragment log: " << program.fragment_info_log() << std::endl;
+        return -1;
 	}
 
 #ifdef DEBUG
@@ -232,6 +243,8 @@ int main(int ac, char * av[]) {
 	auto drawer = program.make_drawer()
 		("camera", camera_position )
 		("texture", io_texture )
+        ("dem", dem_texture )
+        ("norm", normal_texture )
 		("starfield", star_texture )
 		("sun", sun_position )
 		("inv", inverse_transform )
@@ -250,7 +263,7 @@ int main(int ac, char * av[]) {
 		glm::mat4 view = glm::identity<glm::mat4>();
 
 		view = glm::translate(view, glm::vec3(0, 0, -1.5));
-		view = glm::rotate(view, (float)time_now / (float)43., glm::vec3(0, 0.5, 0.75));
+		view = glm::rotate(view, (float)time_now / (float)4., glm::vec3(0, 0.5, 0));
         // view = glm::rotate(view, (float)time_now / (float)65., glm::vec3(0, 0, 1));
 
 		mv = projection * view * m;

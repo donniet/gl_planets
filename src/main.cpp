@@ -81,7 +81,7 @@ int main(int ac, char * av[]) {
 	string fragment_shader = "../shaders/sphere_frag.glsl";
 	string texture_path = "../img/io-2.jpg";
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
-	float fieldOfView = 90., near = 1., far = 10.;
+	float fieldOfView = 120., near = 1., far = 10.;
 
 	options_description desc("options");
 	desc.add_options()

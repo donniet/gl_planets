@@ -62,7 +62,10 @@ public:
 	{
 		data_ = stbi_load(path_.c_str(), &width_, &height_, &channels_, desired_channels);
 
-		if(data_ == nullptr) return;
+		if(data_ == nullptr) {
+            std::cerr << "could not open file: '" << path << "';\n";
+            return;
+        }
 
 		glGenTextures(1, &texture_id);
 		glBindTexture(GL_TEXTURE_2D, texture_id);
@@ -213,8 +216,12 @@ public:
 class Program {
 private:
 	GLuint program_;
+
+    Shader vertex_, fragment_;
 public:
-	Program(GLuint program) : program_(program) {}
+	Program(GLuint program, Shader const & vertex, Shader const & fragment) 
+        : program_(program), vertex_(vertex), fragment_(fragment_)
+    { }
 	operator GLuint() const { return program_; }
 	Program() : program_(0) {} 
 
@@ -229,10 +236,16 @@ public:
 
 		return linker_status == GL_TRUE;
 	}
+    string vertex_info_log() const {
+        return vertex_.info_log();
+    }
+    string fragment_info_log() const {
+        return fragment_.info_log();
+    }
 
 	static pair<Program,bool> from_shader_files(string vertex_path, string fragment_path) {
-		Shader vertex, fragment;
 		bool success;
+        Shader vertex, fragment;
 
 		tie(vertex, success) = Shader::vertex_from_shader_file(vertex_path);
 		if(!success) { return make_pair(Program(), false); }
@@ -245,7 +258,7 @@ public:
 		glAttachShader(prog, fragment);
 		glLinkProgram(prog);
 
-		Program ret(prog);
+	    Program ret(prog, vertex, fragment);
 
 		if(!ret.linker_status()) {
 			return make_pair(ret, false);

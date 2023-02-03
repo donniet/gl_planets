@@ -3,6 +3,8 @@ precision mediump float;
 uniform vec3 camera;
 uniform sampler2D texture;
 uniform sampler2D starfield;
+uniform sampler2D dem;
+uniform sampler2D norm;
 uniform vec3 sun;
 
 varying vec3 direction;
@@ -48,7 +50,7 @@ bool solveQuadratic(float a, float b, float c, out float x0, out float x1, out f
 }
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec3 inter, out vec3 n) {
+bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec3 inter, out vec3 n, out vec3 t, out vec3 b) {
     float r2 = radius * radius;
 
     vec3 L = orig - center;
@@ -70,6 +72,14 @@ bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec
 
     inter = orig + t0 * dir;
     n = normalize(inter - center);
+
+    // texture coords are x == long, y == lat
+
+    float long = atan(n.x, n.z) + 0.1;
+    float r = sqrt(n.x * n.x + n.z * n.z);
+    vec3 n1 = vec3(r * sin(long), n.y, r * cos(long));
+    t = normalize(n1 - n);
+    b = cross(n, t);
 
     return true;
 }
@@ -123,6 +133,7 @@ float Fd_Lambert() {
 void main() {
     vec3 inter = vec3(0.,0.,0.);
     vec3 n = vec3(0., 0., 0.);
+    vec3 b, t;
     vec3 center = vec3(0., 0., 0.);
     vec3 d = normalize(direction);
 
@@ -138,10 +149,18 @@ void main() {
     float linearRoughness = roughness * roughness;
 
 
-    if (rayIntersectsSphere(camera, d, center, 1., inter, n)) {
-        float NoV = abs(dot(n, v)) + 1e-5;
-        float NoL = saturate(dot(n, l));
-        float NoH = saturate(dot(n, h));
+    if (rayIntersectsSphere(camera, d, center, 1., inter, n, t, b)) {
+        vec3 nm = normalize(textureSphere(norm, n).xyz * 0.5 - 0.5);
+
+        // mat3 tbn = mat3(t.x, b.x, n.x, t.y, b.y, n.y, t.z, b.z, n.z);
+        mat3 tbn = mat3(t.x, t.y, t.z, b.x, b.y, b.z, n.x, n.y, n.z);
+        // tbn = transpose(tbn);
+
+        vec3 light_n = normalize(n + 0.5 * tbn * nm);
+
+        float NoV = abs(dot(light_n, v)) + 1e-5;
+        float NoL = saturate(dot(light_n, l));
+        float NoH = saturate(dot(light_n, h));
         float LoH = saturate(dot(l, h));
 
         vec3 baseColor = textureSphere(texture, n).rgb;

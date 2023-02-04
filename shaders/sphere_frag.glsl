@@ -73,11 +73,11 @@ bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec
     inter = orig + t0 * dir;
     n = normalize(inter - center);
 
-    // texture coords are x == long, y == lat
+    // texture coords are x == lon, y == lat
 
-    float long = atan(n.x, n.z) + 0.1;
+    float lon = atan(n.x, n.z) + 0.1;
     float r = sqrt(n.x * n.x + n.z * n.z);
-    vec3 n1 = vec3(r * sin(long), n.y, r * cos(long));
+    vec3 n1 = vec3(r * sin(lon), n.y, r * cos(lon));
     t = normalize(n1 - n);
     b = cross(n, t);
 

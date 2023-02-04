@@ -149,13 +149,27 @@ private:
 		glCompileShader(hdlr);
 		glGetShaderiv(hdlr, GL_COMPILE_STATUS, &status);
 		if(status != GL_TRUE) {
-			return make_pair(Shader(hdlr), false);
+            GLint log_size;
+		    glGetShaderiv(hdlr, GL_INFO_LOG_LENGTH, &log_size);
+            GLchar * log = new GLchar[log_size];
+            glGetShaderInfoLog(hdlr, log_size, &log_size, log);
+
+            std::cerr << "info log:\n" << log << std::endl;
+            delete [] log;
+
+			return {Shader(hdlr), false};
 		}
 
 		return make_pair(Shader(hdlr), true);
 	}
 public:
 	Shader(GLuint shader) : shader_(shader) {}
+    Shader(Shader const & rhs) : shader_(rhs.shader_) {}
+    Shader(Shader && rhs) : shader_(rhs.shader_) {}
+    Shader& operator=(Shader const & rhs) {
+        shader_ = rhs.shader_;
+        return *this;
+    }
 	operator GLuint() const { return shader_; }
 
 	Shader() : shader_(0) {}
@@ -173,7 +187,7 @@ public:
 
 		int log_size = 0;
 		int bytes_written = 0;
-		glGetProgramiv(shader_, GL_INFO_LOG_LENGTH, &log_size);
+		glGetShaderiv(shader_, GL_INFO_LOG_LENGTH, &log_size);
 
 		if (log_size <= 0) {
 			return "";
@@ -181,7 +195,7 @@ public:
 
 		std::unique_ptr<char[]> buffer(new char [log_size]);
 		
-		glGetProgramInfoLog(shader_, log_size, &bytes_written, buffer.get());
+		glGetShaderInfoLog(shader_, log_size, &bytes_written, buffer.get());
 		return string(buffer.get());
 	}
 

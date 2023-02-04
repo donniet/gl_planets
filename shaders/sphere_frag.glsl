@@ -50,7 +50,7 @@ bool solveQuadratic(float a, float b, float c, out float x0, out float x1, out f
 }
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec3 inter, out vec3 n, out vec3 t, out vec3 b) {
+bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec3 inter, out vec3 n, out vec3 t, out vec3 B) {
     float r2 = radius * radius;
 
     vec3 L = orig - center;
@@ -79,7 +79,7 @@ bool rayIntersectsSphere(vec3 orig, vec3 dir, vec3 center, float radius, out vec
     float r = sqrt(n.x * n.x + n.z * n.z);
     vec3 n1 = vec3(r * sin(lon), n.y, r * cos(lon));
     t = normalize(n1 - n);
-    b = cross(n, t);
+    B = cross(n, t);
 
     return true;
 }

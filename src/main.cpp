@@ -75,10 +75,99 @@ MessageCallback( GLenum source,
 }
 
 
+struct Transform {
+    glm::mat4 m;
+    glm::mat4 mInv;
+};
+
+
+class Orbit {
+public:
+    float orbital_radius; /* km */
+    float orbital_speed; /* km/s */
+    float rotation_period; /* s */
+    float axial_tilt; /* radians */
+
+    
+public:
+    glm::mat4 transform(float t) {
+        float orbital_argument = t * orbital_speed / orbital_radius;
+        float rotation_argument = t / rotation_period;
+
+        glm::mat4 ret = glm::identity<glm::mat4>();
+
+        // planet rotation
+        ret = glm::rotate(ret, rotation_argument, glm::vec3(0, 1, 0));
+        // axial tilt
+        ret = glm::rotate(ret, axial_tilt, glm::vec3(0, 0, 1));
+        // planet translation
+        ret = glm::translate(ret, glm::vec3(orbital_radius, 0, 0));
+        // orbital rotation
+        ret = glm::rotate(ret, orbital_argument, glm::vec3(0, 1, 0));
+
+        return ret;
+    }
+};
+
+#if 0
+
+class Scene {
+private:
+    float t; // seconds
+    float fov; // radians
+
+    glm::vec3 sun_position;
+    glm::vec3 jupiter_position;
+    float jupiter_rotation;
+    float jupiter_rotation_period;
+    float jupiter_radius;
+    float jupiter_orbital_radius;
+    float jupiter_orbital_velocity;
+    glm::vec3 io_position;
+    float io_radius;
+    float io_orbital_radius;
+
+    glm::vec3 camera_position;
+    float camera_orbit_radius;
+    
+public:
+    Scene() 
+        : t(0.0f), fov(0.0f), sun_position(0.0f, 0.0f, 0.0f), 
+          jupiter_position(0.0f, 0.0f, 0.0f), jupiter_radius(69911 /* km */), 
+          io_position(0.0f, 0.0f, 0.0f), io_radius(1821 /* km */), io_orbital_radius(0.0f), 
+          camera_position(0.0f, 0.0f, 0.0f), camera_orbit_radius(0.0f),
+          jupiter_rotation(0.0f), jupiter_rotation_period(2. * M_PI / 10. * 60. * 60.)
+    { }
+
+    void set_time(float t) 
+    {
+        this->t = t;
+        
+        jupiter_transform = Orbit{jupiter_orbital_radius, jupiter_orbital_velocity, }
+        update_sun_position();
+        update_jupiter_position();
+        update_io_position();
+        update_camera_position();
+    }
+
+    void update_sun_position() {
+        // sun stays at origin
+    }
+
+    void update_jupiter_position()
+    {
+        jupiter_position = Orbit{jupiter_orbital_radius, jupiter_orbital_velocity}.position(t);
+        jupiter_rotation = jupiter_rotation_speed * t;
+
+    }
+};
+
+#endif
+
 
 int main(int ac, char * av[]) {
-	string vertex_shader = "../shaders/sphere_vert.glsl";
-	string fragment_shader = "../shaders/sphere_frag.glsl";
+	string vertex_shader = "../shaders/sphere.vert";
+	string fragment_shader = "../shaders/sphere.frag";
 	string texture_path = "../img/io-2.jpg";
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
     string dem_path = "../img/io_dem_4096x2048.png";
@@ -176,15 +265,15 @@ int main(int ac, char * av[]) {
 	glfwSwapInterval(1);
 
 
-	Texture io_texture(texture_path);
+	// Texture io_texture(texture_path);
 	Texture star_texture(starfield_path);
     Texture dem_texture(dem_path);
     Texture normal_texture(normal_path);
 
-	if(!io_texture) {
-		cerr << "unable to load texture '" << texture_path << "'\n";
-		return -1;
-	}
+	// if(!io_texture) {
+	// 	cerr << "unable to load texture '" << texture_path << "'\n";
+	// 	return -1;
+	// }
 	if(!star_texture) {
 		cerr << "unable to load starfield '" << starfield_path << "'\n";
 		return -1;
@@ -234,21 +323,28 @@ int main(int ac, char * av[]) {
 	glm::mat4 mv;
 	glm::vec3 camera;
 	glm::vec3 sun;
+    glm::vec3 position(0,0,0);
+    float radius[] = { 4. }; // km
 
 	ArrayBuffer<float,2> corners_buffer(corners);
 	UniformMatrix<float,4> inverse_transform(mv);
 	Uniform<float,3> camera_position(camera);
 	Uniform<float,3> sun_position(sun);
+    UniformArray<float,3> planet_position(&position, 1);
+    UniformArray<float,1> planet_radius(radius, 1);
+    TextureArray planet_textures({texture_path});
 	
 	auto drawer = program.make_drawer()
 		("camera", camera_position )
-		("texture", io_texture )
+		("texture", planet_textures )
         ("dem", dem_texture )
         ("norm", normal_texture )
 		("starfield", star_texture )
 		("sun", sun_position )
 		("inv", inverse_transform )
 		("corner", corners_buffer )
+        ("radius", planet_radius )
+        ("position", planet_position )
 	;
 
 	while (!glfwWindowShouldClose(window))
@@ -262,7 +358,7 @@ int main(int ac, char * av[]) {
 		glm::mat4 m = glm::identity<glm::mat4>();
 		glm::mat4 view = glm::identity<glm::mat4>();
 
-		view = glm::translate(view, glm::vec3(0, 0, -1.5));
+		view = glm::translate(view, glm::vec3(0, 0, -1.5 * radius[0]));
 		view = glm::rotate(view, (float)time_now / (float)4., glm::vec3(0, 0.5, 0));
         // view = glm::rotate(view, (float)time_now / (float)65., glm::vec3(0, 0, 1));
 
@@ -288,7 +384,7 @@ int main(int ac, char * av[]) {
 		
 		/* Update fps counter */
 		time_now = glfwGetTime();
-		printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
+		// printf("%.1fms\n", (time_now - time_of_last_swap) * 1.0e3);
 		time_of_last_swap = time_now;
 		++n_frames;
 

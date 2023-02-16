@@ -15,6 +15,7 @@
 #include <glm/ext/scalar_constants.hpp> // glm::pi
 
 #include <stb/stb_image.h>
+#include <stb/stb_image_resize.h>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -27,9 +28,14 @@
 #include <vector>
 #include <initializer_list>
 #include <algorithm>
+#include <vector>
+#include <array>
 
 // for debugging
 #include <iostream>
+
+#define LOG(msg) { std::cout << __FILE__ << ":" << __LINE__ << " " << msg << std::endl; }
+
 
 using std::string;
 using std::pair;
@@ -67,6 +73,12 @@ public:
             return;
         }
 
+        // // check the texture for a power of 2
+        // if(!is_power_of_two(width_) || !is_power_of_two(height_)) {
+        //     std::cerr << "file '" << path << "' is not a power of 2\n";
+        //     return;
+        // }
+
 		glGenTextures(1, &texture_id);
 		glBindTexture(GL_TEXTURE_2D, texture_id);
 		// TODO: only apply these packing rules when the width/height of the texture demand it
@@ -97,6 +109,10 @@ public:
 		}
 	}
 
+    static bool is_power_of_two(int x) {
+        return (x != 0) && ((x & (x - 1)) == 0);
+    }
+
 	bool is_valid() const { return data_ != nullptr; }
 	operator bool() const { return is_valid(); }
 	unsigned char * data() const { return data_; }
@@ -106,6 +122,112 @@ public:
 	operator GLuint() const { return texture_id; }
 };
 
+template<typename ... Texs>
+struct textureContainer;
+
+template<typename Tex, typename ... Texs>
+struct textureContainer<Tex, Texs...> : public textureContainer<Texs...> {
+    textureContainer(Tex const & tex, Texs const & ... texs) : textureContainer<Texs...>(texs...) {
+        textureContainer<Texs...>::push_back(tex);
+    }
+};
+
+template<>
+struct textureContainer<> {
+    vector<Texture const *> textures_;
+    textureContainer() {}
+
+    void push_back(Texture const & tex) {
+        textures_.push_back(&tex);
+    }
+};
+
+template<typename ... Texs> 
+vector<Texture const *> make_texture_container(Texs const & ... texs) {
+    return textureContainer<Texs...>(texs...).textures_;
+}
+
+class TextureArray {
+    GLuint texture_id_;
+    vector<string> paths_;
+    vector<unsigned char *> data_;
+    int width_;
+    int height_;
+    int channels_;
+
+    void init() {
+        // load all the images
+        size_t count = paths_.size();
+
+        vector<int>             widths(count);
+        vector<int>             heights(count);
+        vector<int>             channels(count);
+        vector<unsigned char *> temp(count);
+
+        for(int i = 0; i < count; i++) {
+            temp[i] = stbi_load(paths_[i].c_str(), &widths[i], &heights[i], &channels[i], 3);
+        }
+
+        auto max_width = *std::max_element(widths.begin(), widths.end());
+        auto max_height = *std::max_element(heights.begin(), heights.end());
+
+        // next power of 2
+        int siz = 1;
+        int levels = 0; // eventually set mipmap levels
+        for(; siz < max_width && siz < max_height; siz <<= 1, levels++) { }
+
+
+
+        data_.resize(count);
+
+        for(int i = 0; i < count; i++) {
+            data_[i] = new unsigned char[max_width * max_height * 3];
+            stbir_resize_uint8(temp[i], widths[i], heights[i], 0, 
+                               data_[i], siz, siz, 0, 3);
+        }
+
+        // LOG("glGenTextures")
+        glGenTextures(1, &texture_id_);
+        // LOG("glBindTexure")
+        glBindTexture(GL_TEXTURE_2D_ARRAY, texture_id_);
+        // LOG("glTexStorage3D")
+        glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGB8, siz, siz, count);
+        for(int i = 0; i < count; i++) {
+            // LOG("glTexSubImage3D")
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, siz, siz, count, GL_RGB, GL_UNSIGNED_BYTE, data_[i]);
+        }
+        // glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        // glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		// glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        
+
+        for(int i = 0; i < count; i++) {
+            stbi_image_free(temp[i]);
+            temp[i] = nullptr;
+        }
+
+    }
+
+public:
+    operator GLuint() const { return texture_id_; }
+    TextureArray(vector<string> const & paths)
+        : paths_(paths)
+    { init(); }
+
+    template<size_t LEN>
+    TextureArray(std::array<string, LEN> const & paths)
+        : paths_(paths.begin(), paths.end())
+    { init(); }
+
+    ~TextureArray()
+    {
+        for(unsigned char *& dat : data_) {
+            delete [] dat;
+            dat = nullptr;
+        }
+    }
+};
 
 class Shader {
 private:
@@ -234,7 +356,7 @@ private:
     Shader vertex_, fragment_;
 public:
 	Program(GLuint program, Shader const & vertex, Shader const & fragment) 
-        : program_(program), vertex_(vertex), fragment_(fragment_)
+        : program_(program), vertex_(vertex), fragment_(fragment)
     { }
 	operator GLuint() const { return program_; }
 	Program() : program_(0) {} 
@@ -297,6 +419,38 @@ programParameters::programParameters(Program const & p) :
 
 
 template<>
+programParameters & programParameters::operator()(string const & name, TextureArray const & dat) {
+    GLint location = glGetUniformLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	GLuint texture_id = texture_count_++;
+	texture_ids_[location] = texture_id;
+
+	param_setters_.push_back([&dat, location, texture_id]() { 
+		glActiveTexture(GL_TEXTURE0 + texture_id);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, dat);
+        // glBindTextures(0, dat.size(), dat.textures());
+		glUniform1i(location, texture_id);
+	});
+
+	return *this;
+}
+
+
+template<>
+programParameters & programParameters::operator()(string const & name, float const & dat) 
+{
+    GLint location = glGetUniformLocation(program_, name.c_str());
+    if(location < 0) return *this;
+
+    param_setters_.push_back([&dat, location]() {
+        glUniform1f(location, dat);
+    });
+    return *this;
+}
+
+
+template<>
 programParameters & programParameters::operator()<>(string const & name, Texture const & dat) 
 {
 	GLint location = glGetUniformLocation(program_, name.c_str());
@@ -316,9 +470,10 @@ programParameters & programParameters::operator()<>(string const & name, Texture
 
 void programParameters::draw_arrays_triangle_fan() {
 	glUseProgram(program_);
-	for(auto const & p : param_setters_) {
+    
+	for(auto const & p : param_setters_)
 		p();
-	}
+
 	glDrawArrays(GL_TRIANGLE_FAN, 0, geometry_count_);
 }
 
@@ -378,7 +533,6 @@ public:
 	}
 };
 
-
 template<>
 programParameters & programParameters::operator()<>(string const & name, Uniform<float,3> const & dat) 
 {
@@ -386,6 +540,60 @@ programParameters & programParameters::operator()<>(string const & name, Uniform
 	if(location < 0) return *this;
 
 	param_setters_.push_back(bind(&Uniform<float,3>::setup_parameter, &dat, location));
+	return *this;
+}
+
+
+template<typename T, size_t siz> class UniformArray;
+template<> class UniformArray<float, 3> {
+    typedef glm::vec3 data_type;
+    friend class programParameters;
+private:
+    data_type const * data_;
+    size_t len_;
+public:
+    UniformArray(data_type const * data, size_t len) 
+        : data_(data), len_(len)
+    { }
+
+    void setup_parameter(GLint location) const {
+        glUniform3fv(location, len_, &(*data_)[0]);
+    }
+};
+
+template<>
+programParameters & programParameters::operator()<>(string const & name, UniformArray<float,3> const & dat) 
+{
+	GLint location = glGetUniformLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	param_setters_.push_back(bind(&UniformArray<float,3>::setup_parameter, &dat, location));
+	return *this;
+}
+
+template<> class UniformArray<float, 1> {
+    typedef float data_type;
+    friend class programParameters;
+private:
+    data_type const * data_;
+    size_t len_;
+public:
+    UniformArray(data_type const * data, size_t len) 
+        : data_(data), len_(len)
+    { }
+
+    void setup_parameter(GLint location) const {
+        glUniform1fv(location, len_, data_);
+    }
+};
+
+template<>
+programParameters & programParameters::operator()<>(string const & name, UniformArray<float,1> const & dat) 
+{
+	GLint location = glGetUniformLocation(program_, name.c_str());
+	if(location < 0) return *this;
+
+	param_setters_.push_back(bind(&UniformArray<float,1>::setup_parameter, &dat, location));
 	return *this;
 }
 

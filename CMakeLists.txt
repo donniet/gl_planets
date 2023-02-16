@@ -19,7 +19,7 @@ add_executable(gl_planets src/main.cpp)
 target_include_directories(gl_planets PRIVATE ${Boost_INCLUDE_DIR} ${GLEW_INCLUDE_DIRS} ${OPENGL_INCLUDE_DIR})
 target_link_libraries(gl_planets stb glfw OpenGL::GL glm::glm ${Boost_LIBRARIES} ${GLEW_LIBRARIES})
 
-target_compile_features(gl_planets PRIVATE cxx_std_17)
+target_compile_features(gl_planets PRIVATE cxx_std_20)
 target_compile_definitions(gl_planets PRIVATE DEBUG)
 
 

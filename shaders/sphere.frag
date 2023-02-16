@@ -1,8 +1,6 @@
-#extension GL_EXT_texture_array : enable
+
 
 precision mediump float;
-
-#define PLANETS 1
 
 uniform vec3 camera;
 uniform sampler2D starfield;

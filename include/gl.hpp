@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <vector>
 #include <array>
+#include <sstream>
 
 // for debugging
 #include <iostream>
@@ -52,6 +53,7 @@ using std::tuple;
 using std::initializer_list;
 using std::bind;
 using std::fill;
+using std::stringstream;
 
 class Texture {
 private:
@@ -121,31 +123,6 @@ public:
 
 	operator GLuint() const { return texture_id; }
 };
-
-template<typename ... Texs>
-struct textureContainer;
-
-template<typename Tex, typename ... Texs>
-struct textureContainer<Tex, Texs...> : public textureContainer<Texs...> {
-    textureContainer(Tex const & tex, Texs const & ... texs) : textureContainer<Texs...>(texs...) {
-        textureContainer<Texs...>::push_back(tex);
-    }
-};
-
-template<>
-struct textureContainer<> {
-    vector<Texture const *> textures_;
-    textureContainer() {}
-
-    void push_back(Texture const & tex) {
-        textures_.push_back(&tex);
-    }
-};
-
-template<typename ... Texs> 
-vector<Texture const *> make_texture_container(Texs const & ... texs) {
-    return textureContainer<Texs...>(texs...).textures_;
-}
 
 class TextureArray {
     GLuint texture_id_;
@@ -251,7 +228,11 @@ private:
 
 		return make_pair(move(buffer), true);
 	}
-	static pair<Shader,bool> shader_from_shader_file(string file_name, GLenum shader_type) {
+	static pair<Shader,bool> shader_from_shader_file(
+        string file_name, GLenum shader_type, 
+        vector<string> const & extensions = {}, 
+        vector<pair<string,string>> defines = {}) 
+    {
 		shared_ptr<char[]> buffer;
 		bool success;
 
@@ -266,8 +247,22 @@ private:
 		GLuint hdlr;
 		GLint status;
 
+        stringstream extenstr;
+        for(auto const & ext : extensions) {
+            extenstr << "#extension " << ext << " : enable\n";
+        }
+        stringstream defstr;
+        for(auto const & def : defines) {
+            defstr << "#define " << def.first << " " << def.second << "\n";
+        }
+
+        auto exts = extenstr.str();
+        auto defs = defstr.str();
+
+        GLchar const * sources[] = { exts.c_str(), defs.c_str(), sh };
+
 		hdlr = glCreateShader(shader_type);
-		glShaderSource(hdlr, 1, (const GLchar*const*)&sh, NULL);
+		glShaderSource(hdlr, 3, sources, NULL);
 		glCompileShader(hdlr);
 		glGetShaderiv(hdlr, GL_COMPILE_STATUS, &status);
 		if(status != GL_TRUE) {
@@ -321,11 +316,19 @@ public:
 		return string(buffer.get());
 	}
 
-	static pair<Shader,bool> vertex_from_shader_file(string file_path) {
-		return shader_from_shader_file(file_path, GL_VERTEX_SHADER);
+	static pair<Shader,bool> vertex_from_shader_file(
+        string file_path, 
+        vector<string> const & extensions = {}, 
+        vector<pair<string,string>> defines = {}) 
+    {
+		return shader_from_shader_file(file_path, GL_VERTEX_SHADER, extensions, defines);
 	}
-	static pair<Shader,bool> fragment_from_shader_file(string file_path) {
-		return shader_from_shader_file(file_path, GL_FRAGMENT_SHADER);
+	static pair<Shader,bool> fragment_from_shader_file(
+        string file_path, 
+        vector<string> const & extensions = {}, 
+        vector<pair<string,string>> defines = {}) 
+    {
+		return shader_from_shader_file(file_path, GL_FRAGMENT_SHADER, extensions, defines);
 	}		
 };
 
@@ -379,14 +382,18 @@ public:
         return fragment_.info_log();
     }
 
-	static pair<Program,bool> from_shader_files(string vertex_path, string fragment_path) {
+	static pair<Program,bool> from_shader_files(
+        string vertex_path, string fragment_path, 
+        vector<string> const & extensions = {}, 
+        vector<pair<string,string>> defines = {}) 
+    {
 		bool success;
         Shader vertex, fragment;
 
-		tie(vertex, success) = Shader::vertex_from_shader_file(vertex_path);
+		tie(vertex, success) = Shader::vertex_from_shader_file(vertex_path, extensions, defines);
 		if(!success) { return make_pair(Program(), false); }
 
-		tie(fragment, success) = Shader::fragment_from_shader_file(fragment_path); 
+		tie(fragment, success) = Shader::fragment_from_shader_file(fragment_path, extensions, defines); 
 		if(!success) { return make_pair(Program(), false); }
 
 		GLuint prog = glCreateProgram();

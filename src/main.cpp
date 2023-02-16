@@ -323,14 +323,14 @@ int main(int ac, char * av[]) {
 	glm::mat4 mv;
 	glm::vec3 camera;
 	glm::vec3 sun;
-    glm::vec3 position(0,0,0);
+    glm::vec3 position[] = {glm::vec3(2,0,0)};
     float radius[] = { 4. }; // km
 
 	ArrayBuffer<float,2> corners_buffer(corners);
 	UniformMatrix<float,4> inverse_transform(mv);
 	Uniform<float,3> camera_position(camera);
 	Uniform<float,3> sun_position(sun);
-    UniformArray<float,3> planet_position(&position, 1);
+    UniformArray<float,3> planet_position(position, 1);
     UniformArray<float,1> planet_radius(radius, 1);
     TextureArray planet_textures({texture_path});
 	

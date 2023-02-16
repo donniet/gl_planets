@@ -145,9 +145,9 @@ float Fd_Burley(float linearRoughness, float NoV, float NoL, float LoH) {
 }
 
 
-float Fd_Lambert() {
-    return 1.0 / PI;
-}
+// float Fd_Lambert() {
+//     return 1.0 / PI;
+// }
 
 void main() {
 
@@ -169,45 +169,46 @@ void main() {
     float linearRoughness = roughness * roughness;
 
 
-    if (rayIntersectsSphere(camera, d, center, radius[0], inter, n, t, b)) {
-        vec3 nm = normalize(textureSphereArray(norm, n, 0).xyz * 0.5 - 0.5);
+    for(int i = 0; i < PLANETS; i++) {
+        if (rayIntersectsSphere(camera, d, position[i], radius[i], inter, n, t, b)) {
+            vec3 nm = normalize(textureSphereArray(norm, n, i).xyz * 0.5 - 0.5);
 
-        // mat3 tbn = mat3(t.x, b.x, n.x, t.y, b.y, n.y, t.z, b.z, n.z);
-        mat3 tbn = mat3(t.x, t.y, t.z, b.x, b.y, b.z, n.x, n.y, n.z);
-        // tbn = transpose(tbn);
+            // mat3 tbn = mat3(t.x, b.x, n.x, t.y, b.y, n.y, t.z, b.z, n.z);
+            mat3 tbn = mat3(t.x, t.y, t.z, b.x, b.y, b.z, n.x, n.y, n.z);
+            // tbn = transpose(tbn);
 
-        vec3 light_n = normalize(n + 0.5 * tbn * nm);
+            vec3 light_n = normalize(n + 0.5 * tbn * nm);
 
-        float NoV = abs(dot(light_n, v)) + 1e-5;
-        float NoL = saturate(dot(light_n, l));
-        float NoH = saturate(dot(light_n, h));
-        float LoH = saturate(dot(l, h));
+            float NoV = abs(dot(light_n, v)) + 1e-5;
+            float NoL = saturate(dot(light_n, l));
+            float NoH = saturate(dot(light_n, h));
+            float LoH = saturate(dot(l, h));
 
-        vec3 baseColor = textureSphereArray(texture, n, 0).rgb;
-        vec3 diffuseColor = (1.0 - metallic) * baseColor.rgb;
-        vec3 f0 = 0.04 * (1.0 - metallic) + baseColor.rgb * metallic;
+            vec3 baseColor = textureSphereArray(texture, n, i).rgb;
+            vec3 diffuseColor = (1.0 - metallic) * baseColor.rgb;
+            vec3 f0 = 0.04 * (1.0 - metallic) + baseColor.rgb * metallic;
 
-        //TODO: add shadows
-        // float attenuation = shadow(vec3(0,0,0), l);
-        float attenuation = 1.0;
+            //TODO: add shadows
+            // float attenuation = shadow(vec3(0,0,0), l);
+            float attenuation = 1.0;
 
-        // specular BRDF
-        float D = D_GGX(linearRoughness, NoH, h);
-        float V = V_SmithGGXCorrelated(linearRoughness, NoV, NoL);
-        vec3  F = F_Schlick(f0, LoH);
-        vec3 Fr = (D * V) * F;
-        // diffuse BRDF
-        vec3 Fd = diffuseColor * Fd_Burley(linearRoughness, NoV, NoL, LoH);
+            // specular BRDF
+            float D = D_GGX(linearRoughness, NoH, h);
+            float V = V_SmithGGXCorrelated(linearRoughness, NoV, NoL);
+            vec3  F = F_Schlick(f0, LoH);
+            vec3 Fr = (D * V) * F;
+            // diffuse BRDF
+            vec3 Fd = diffuseColor * Fd_Burley(linearRoughness, NoV, NoL, LoH);
 
-        vec3 color = Fd + Fr;
-        // color *= intensity;
-        color *= (intensity * attenuation * NoL) * vec3(0.98, 0.92, 0.89);
+            vec3 color = Fd + Fr;
+            // color *= intensity;
+            color *= (intensity * attenuation * NoL) * vec3(0.98, 0.92, 0.89);
 
-        gl_FragColor = vec4(color.rgb, 1.0);
-        return;
-    } else {
-        
-        gl_FragColor = textureSphere(starfield, d); 
+            gl_FragColor = vec4(color.rgb, 1.0);
+            return;
+        }
     }
+
+    gl_FragColor = textureSphere(starfield, d); 
 
 }

@@ -327,7 +327,7 @@ int main(int ac, char * av[]) {
 	glm::mat4 mv;
 	glm::vec3 camera;
 	glm::vec3 sun;
-    glm::vec3 position[] = { glm::vec3(2,0,0), glm::vec3(0,0,0) };
+    glm::vec3 position[] = { glm::vec3(1.5,0,0), glm::vec3(0,0,0) };
     float radius[] = { 4., 5. }; // km
     std::array<string,2> texture_paths = { texture_path, "../img/marsb.jpg" };
 

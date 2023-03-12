@@ -192,7 +192,7 @@ void main() {
     vec3 r = normalize(reflect(direction, n));
 
     float metallic = 0.2;
-    float roughness = 0.8;
+    float roughness = 0.5;
     float intensity = 2.0;
 
     vec3 nm, baseColor;

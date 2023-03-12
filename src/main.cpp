@@ -189,7 +189,7 @@ int main(int ac, char * av[]) {
 	string starfield_path = "../img/TychoSkymapII.t3_04096x02048.jpg";
     string dem_path = "../img/io_dem_4096x2048.png";
     string normal_path = "../img/io_normal_4096x2048.jpg";
-	float fieldOfView = 120., near = 1., far = 10.;
+	float fieldOfView = 75., near = 45., far = 1000.;
 
 	options_description desc("options");
 	desc.add_options()
@@ -285,7 +285,7 @@ int main(int ac, char * av[]) {
 	// Texture io_texture(texture_path);
 	Texture star_texture(starfield_path);
     Texture dem_texture(dem_path);
-    Texture normal_texture(normal_path);
+    // Texture normal_texture(normal_path);
 
 	// if(!io_texture) {
 	// 	cerr << "unable to load texture '" << texture_path << "'\n";
@@ -351,9 +351,10 @@ int main(int ac, char * av[]) {
 	glm::mat4 mv;
 	glm::vec3 camera;
 	glm::vec3 sun;
-    glm::vec3 position[] = { glm::vec3(1.5,0,0), glm::vec3(0,0,0) };
-    float radius[] = { 4., 5. }; // km
-    std::array<string,2> texture_paths = { "../img/marsb.jpg", texture_path };
+    glm::vec3 position[] = { glm::vec3(50,0,0), glm::vec3(0,0,0) };
+    float radius[] = { 35., 5. }; // km
+    std::array<string,2> texture_paths = { "../img/20180511_jupiter_map_css_plus_juno_bj.jpg", texture_path };
+    std::array<string,2> norm_paths = { "../img/io_normal_4096x2048.jpg", "../img/io_normal_4096x2048.jpg" };
 
 	ArrayBuffer<float,2> corners_buffer(corners);
 	UniformMatrix<float,4> inverse_transform(mv);
@@ -362,12 +363,13 @@ int main(int ac, char * av[]) {
     UniformArray<float,3> planet_position(position, 2);
     UniformArray<float,1> planet_radius(radius, 2);
     TextureArray planet_textures(texture_paths);
+    TextureArray planet_normals(norm_paths);
 	
 	auto drawer = program.make_drawer()
 		("camera", camera_position )
 		("texture", planet_textures )
+        ("norm", planet_normals )
         ("dem", dem_texture )
-        ("norm", normal_texture )
 		("starfield", star_texture )
 		("sun", sun_position )
 		("inv", inverse_transform )
@@ -387,8 +389,8 @@ int main(int ac, char * av[]) {
 		glm::mat4 m = glm::identity<glm::mat4>();
 		glm::mat4 view = glm::identity<glm::mat4>();
 
-		view = glm::translate(view, glm::vec3(0, 0, -1.5 * radius[0]));
-		view = glm::rotate(view, (float)time_now / (float)4., glm::vec3(0, 0.5, 0));
+		view = glm::translate(view, glm::vec3(0, 0, -10.));
+		view = glm::rotate(view, (float)time_now / (float)400., glm::vec3(0, 0.5, 0));
         // view = glm::rotate(view, (float)time_now / (float)65., glm::vec3(0, 0, 1));
 
 		mv = projection * view * m;
@@ -400,9 +402,9 @@ int main(int ac, char * av[]) {
 		// cout << "camera: " << camera.x << " " << camera.y << " " << camera.z << " " << camera.w << endl;
 
 		sun = glm::vec3(
-			glm::cos((float)time_now / (float)600.), 
+			glm::cos((float)time_now / (float)60.), 
 			0.,
-			-glm::sin((float)time_now / (float)600.));
+			-glm::sin((float)time_now / (float)60.));
 
 		drawer.draw_arrays_triangle_fan();
 		

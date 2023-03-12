@@ -82,6 +82,25 @@ struct Transform {
 
 
 class Orbit {
+private:
+    float radius_;
+    glm::mat4 translate_;
+
+public:
+    Orbit(float radius) : radius_(radius) {
+        translate_ = glm::translate(glm::identity<glm::mat4>(), glm::vec3(radius, 0.0f, 0.0f));    
+    }
+
+    glm::mat4 operator()(float distance) const {
+        return glm::rotate(translate_, glm::radians(distance / radius_), glm::vec3(0.0f, 0.0f, 1.0f));
+    }
+};
+
+
+#if 0
+
+
+class Orbit {
 public:
     float orbital_radius; /* km */
     float orbital_speed; /* km/s */
@@ -108,8 +127,6 @@ public:
         return ret;
     }
 };
-
-#if 0
 
 class Scene {
 private:
@@ -324,12 +341,19 @@ int main(int ac, char * av[]) {
 		-1, 1
 	};
 
+
+    auto camera_orbit = Orbit(10. /* km */);
+    auto io_orbit = Orbit(1821. /* km */);
+    auto jupiter_orbit = Orbit(740000. /* km */);
+
+
+
 	glm::mat4 mv;
 	glm::vec3 camera;
 	glm::vec3 sun;
     glm::vec3 position[] = { glm::vec3(1.5,0,0), glm::vec3(0,0,0) };
     float radius[] = { 4., 5. }; // km
-    std::array<string,2> texture_paths = { texture_path, "../img/marsb.jpg" };
+    std::array<string,2> texture_paths = { "../img/marsb.jpg", texture_path };
 
 	ArrayBuffer<float,2> corners_buffer(corners);
 	UniformMatrix<float,4> inverse_transform(mv);

@@ -168,15 +168,15 @@ class TextureArray {
         // LOG("glBindTexure")
         glBindTexture(GL_TEXTURE_2D_ARRAY, texture_id_);
         // LOG("glTexStorage3D")
-        glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGB8, siz, siz, count);
+        glTexStorage3D(GL_TEXTURE_2D_ARRAY, levels, GL_RGB8, siz, siz, count);
         for(int i = 0; i < count; i++) {
             // LOG("glTexSubImage3D")
-            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, siz, siz, count, GL_RGB, GL_UNSIGNED_BYTE, data_[i]);
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, siz, siz, 1, GL_RGB, GL_UNSIGNED_BYTE, data_[i]);
         }
-        // glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        // glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		// glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		// glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         
 
         for(int i = 0; i < count; i++) {
